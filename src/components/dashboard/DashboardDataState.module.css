@@ -1,0 +1,52 @@
+.stateBox {
+  align-items: center;
+  background: #f7f4fa;
+  border: 1px solid #dad6e3;
+  border-radius: 10px;
+  color: #17203a;
+  display: grid;
+  justify-items: center;
+  padding: 28px 16px;
+  text-align: center;
+}
+
+.spinnerWrap {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.spinner {
+  animation: spin 0.9s linear infinite;
+  border: 2px solid #bfd0f1;
+  border-radius: 50%;
+  border-top-color: #3a62a6;
+  display: inline-block;
+  height: 20px;
+  width: 20px;
+}
+
+.stateBox h4 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.stateBox p {
+  color: #2f3d5f;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+  max-width: 520px;
+}
+
+.stateBox a,
+.stateBox button {
+  margin-top: 14px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

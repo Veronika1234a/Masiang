@@ -1,65 +1,197 @@
 import Image from "next/image";
+import { MarketingFooter } from "@/components/layout/MarketingFooter";
+import { MarketingHeader, type NavItem } from "@/components/layout/MarketingHeader";
+import { Button } from "@/components/ui/Button";
+import styles from "./page.module.css";
+
+const assets = {
+  texture: "/assets/masiang/texture.svg",
+  logo: "/assets/masiang/logo.svg",
+  heroPreview: "/assets/masiang/hero-preview.svg",
+  aboutPhoto: "/assets/masiang/about-photo.svg",
+  iconPerson: "/assets/masiang/step-person.svg",
+  iconDoc: "/assets/masiang/step-doc.svg",
+  iconUpload: "/assets/masiang/step-upload.svg",
+  iconStamp: "/assets/masiang/step-stamp.svg",
+  footerPerson: "/assets/masiang/footer-contact.svg",
+  footerSchool: "/assets/masiang/footer-location.svg",
+  footerClock: "/assets/masiang/footer-clock.svg",
+};
+
+const navItems: NavItem[] = [
+  { label: "Beranda", href: "/#beranda" },
+  { label: "Layanan", href: "/#layanan" },
+  { label: "Tentang", href: "/#tentang" },
+  { label: "Kontak", href: "/#kontak" },
+];
+
+const steps = [
+  {
+    title: "Melayani Sekolah",
+    description: "Sekolah mendaftar dan mengajukan pendampingan.",
+    icon: assets.iconPerson,
+  },
+  {
+    title: "Pendampingan",
+    description: "Unggah dokumen kebutuhan program pendampingan.",
+    icon: assets.iconDoc,
+  },
+  {
+    title: "Pelaksanaan",
+    description: "Monitoring kegiatan dan unggah bukti pelaksanaan.",
+    icon: assets.iconUpload,
+  },
+  {
+    title: "Laporan & Evaluasi",
+    description: "Unduh hasil pendampingan beserta evaluasinya.",
+    icon: assets.iconStamp,
+  },
+];
+
+const missionPoints = [
+  "Mendampingi sekolah meningkatkan mutu pendidikan melalui pendekatan terstruktur, berbasis data, dan berkelanjutan.",
+  "Menyediakan alur kolaboratif yang jelas untuk sekolah, pengawas, dan tim pendamping.",
+];
+
+const contactItems = [
+  {
+    title: "Kontak",
+    value: ["info@masiang.id", "+62 812 3456 7890"],
+    icon: assets.footerPerson,
+  },
+  {
+    title: "Alamat",
+    value: ["Jl. Pendidikan No. 21, Tana Toraja"],
+    icon: assets.footerSchool,
+  },
+  {
+    title: "Jam Operasional",
+    value: ["Senin - Jumat, 08.00 - 16.30 WITA"],
+    icon: assets.footerClock,
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className={styles.page}>
+      <section className={styles.hero} id="beranda">
+        <div className={styles.textureWrap} aria-hidden="true">
+          <Image src={assets.texture} alt="" fill priority className={styles.texture} />
+        </div>
+        <div className={styles.glowA} />
+        <div className={styles.glowB} />
+
+        <MarketingHeader
+          logoSrc={assets.logo}
+          brandName="MASIANG"
+          navItems={navItems}
+          loginHref="/login"
+          registerHref="/daftar-sekolah"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+        <div className={styles.heroContent}>
+          <div className={styles.heroCopy}>
+            <p className={styles.overline}>Sistem Pendampingan Pendidikan</p>
+            <h1>
+              Sistem Pendampingan
+              <br />
+              Berbasis MASIANG
+            </h1>
+            <p className={styles.subtitle}>
+              Mendampingi sekolah dalam meningkatkan mutu pendidikan melalui
+              pendekatan yang terstruktur, berbasis data, dan berkelanjutan.
+            </p>
+            <div className={styles.heroActions}>
+              <Button href="/daftar-sekolah" variant="primary" size="lg">
+                Ajukan Pendampingan
+              </Button>
+              <Button href="/#layanan" variant="dark" size="lg">
+                Lihat Alur
+              </Button>
+            </div>
+            <div className={styles.pillRow}>
+              <span>Terstruktur</span>
+              <span>Transparan</span>
+              <span>Kolaboratif</span>
+            </div>
+          </div>
+
+          <figure className={styles.previewFrame}>
+            <Image
+              src={assets.heroPreview}
+              alt="Preview dashboard MASIANG"
+              width={700}
+              height={460}
+              priority
+            />
+            <figcaption>Contoh tampilan dashboard pendampingan</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section className={styles.stepsSection} id="layanan">
+        <div className={styles.sectionHeading}>
+          <p>Alur Layanan</p>
+          <h2>Tahapan Pendampingan</h2>
+        </div>
+        <div className={styles.stepGrid}>
+          {steps.map((step, idx) => (
+            <article key={step.title} className={styles.stepCard}>
+              <Image src={step.icon} alt="" width={80} height={80} aria-hidden="true" />
+              <h3>
+                <span style={{ color: "#d2ac50", marginRight: 4 }}>0{idx + 1}.</span>
+                {step.title}
+              </h3>
+              <p>{step.description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.aboutSection} id="tentang">
+        <div className={styles.aboutPhotoCard}>
+          <Image src={assets.aboutPhoto} alt="Tim pendamping MASIANG" width={700} height={860} />
+        </div>
+        <article className={styles.aboutContent}>
+          <p className={styles.aboutTag}>Tentang Pengawas</p>
+          <h2>Ilyas Kala Lembang, M.Pd.</h2>
+          <p className={styles.aboutLead}>
+            Pengawas pendidikan yang berfokus pada peningkatan mutu sekolah
+            dengan pendampingan yang adaptif dan berkelanjutan.
+          </p>
+          <ul className={styles.missionList}>
+            {missionPoints.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        </article>
+      </section>
+
+      <section className={styles.ctaBand}>
+        <div>
+          <h3>Siap memulai pendampingan sekolah Anda?</h3>
+          <p className={styles.ctaSubtext}>
+            Daftarkan sekolah Anda dan mulai proses pendampingan yang terstruktur bersama MASIANG.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div style={{ display: "flex", gap: 12, flexShrink: 0, flexWrap: "wrap" }}>
+          <Button href="/daftar-sekolah" variant="primary" size="lg">
+            Daftar Sekolah
+          </Button>
+          <Button href="/login" variant="ghost" size="lg">
+            Login
+          </Button>
         </div>
-      </main>
-    </div>
+      </section>
+
+      <MarketingFooter
+        id="kontak"
+        logoSrc={assets.logo}
+        brandName="MASIANG"
+        summary="Sistem Pendampingan Berbasis MASIANG. Pendampingan pendidikan yang lebih rapi dan terukur."
+        textureSrc={assets.texture}
+        contactItems={contactItems}
+      />
+    </main>
   );
 }

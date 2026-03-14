@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --bg: #f5f4f8;
+  --ink: #1f2f4f;
+  --ink-soft: #3b4d73;
+  --deep: #0f1f3d;
+  --line: #62739a;
+  --card: #f8f8fc;
+  --accent: #ff9408;
+  --accent-deep: #de7f00;
+  --focus-ring: #ffb14a;
+  --focus-shadow: rgba(255, 148, 8, 0.35);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  padding: 0;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: #121421;
+  font-family: var(--font-plus-jakarta), "Segoe UI", sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px var(--focus-shadow);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }

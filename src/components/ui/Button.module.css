@@ -1,0 +1,102 @@
+.button {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 700;
+  justify-content: center;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+  white-space: nowrap;
+}
+
+.button:hover {
+  box-shadow: 0 10px 22px rgba(20, 30, 50, 0.12);
+  transform: translateY(-1px);
+}
+
+.button:active {
+  transform: translateY(0);
+}
+
+.button:focus-visible {
+  outline-offset: 3px;
+}
+
+.disabled,
+.button[aria-disabled="true"] {
+  box-shadow: none;
+  cursor: not-allowed;
+  filter: grayscale(0.15);
+  opacity: 0.65;
+  transform: none;
+}
+
+.sm {
+  font-size: 13px;
+  padding: 10px 14px;
+}
+
+.md {
+  font-size: 14px;
+  padding: 12px 20px;
+}
+
+.lg {
+  font-size: 15px;
+  padding: 14px 22px;
+}
+
+.primary {
+  background: linear-gradient(180deg, #ddb86b 0%, #d2a24b 100%);
+  border-color: #b8933d;
+  color: #ffffff;
+}
+
+.ghost {
+  background: #f3f2f8;
+  border-color: #d7deef;
+  color: #4f5b77;
+}
+
+.dark {
+  background: #25365f;
+  border-color: #304878;
+  color: #ffffff;
+}
+
+.outline {
+  background: #ffffff;
+  border-color: #cfd5e6;
+  color: #4f5b77;
+}
+
+.primary:hover {
+  background: #b8933d;
+  border-color: #a28235;
+}
+
+.ghost:hover {
+  background: #e9edf5;
+  border-color: #c8d2e4;
+  color: #25365f;
+}
+
+.dark:hover {
+  background: #304878;
+  border-color: #39558d;
+}
+
+.outline:hover {
+  background: #eef1f8;
+  border-color: #c0cade;
+  color: #25365f;
+}
