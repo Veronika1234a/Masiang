@@ -1,3 +1,4 @@
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "../client";
 import type { Database } from "../types";
 
@@ -47,6 +48,51 @@ export async function signOut() {
   const supabase = createClient();
   const { error } = await supabase.auth.signOut();
   return { error: error?.message ?? null };
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+) {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user?.email) {
+    return { error: "Sesi login tidak valid. Silakan login ulang." };
+  }
+
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+
+  if (verifyError) {
+    return { error: "Kata sandi saat ini tidak sesuai." };
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+
+  return { error: error?.message ?? null };
+}
+
+export async function updateUserMetadata(
+  updates: Record<string, unknown>,
+): Promise<{ user: User | null; error: string | null }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.updateUser({
+    data: updates,
+  });
+
+  if (error) {
+    return { user: null, error: error.message };
+  }
+
+  return { user: data.user, error: null };
 }
 
 export async function getSession() {

@@ -143,14 +143,30 @@ function AdminNotificationBell() {
 export function AdminShell({ navItems, children }: AdminShellProps) {
   const pathname = usePathname();
   const { logout } = useAuth();
+  const { addToast } = useDashboard();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const activeNav = [...navItems]
     .sort((a, b) => b.href.length - a.href.length)
     .find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 
   const handleLogout = async () => {
-    await logout();
-    window.location.assign("/login");
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      window.location.replace("/login");
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Logout gagal. Coba lagi.";
+      addToast(message, "error");
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -191,11 +207,11 @@ export function AdminShell({ navItems, children }: AdminShellProps) {
             <p className={styles.accountName}>Admin MASIANG</p>
             <p className={styles.accountMeta}>Pengawas / Pembicara</p>
           </div>
-          <button type="button" onClick={handleLogout} className={styles.logout} aria-label="Logout">
+          <button type="button" onClick={handleLogout} className={styles.logout} aria-label="Logout" disabled={isLoggingOut}>
             <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
               <path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3Zm4.59 4.41L13.17 8.83 15.34 11H8v2h7.34l-2.17 2.17 1.42 1.42L19.17 12l-4.58-4.59Z" fill="currentColor" />
             </svg>
-            <span>Logout</span>
+            <span>{isLoggingOut ? "Keluar..." : "Logout"}</span>
           </button>
         </div>
       </aside>

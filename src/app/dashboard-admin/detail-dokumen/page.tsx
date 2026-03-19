@@ -5,7 +5,10 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { useDashboard } from "@/lib/DashboardContext";
-import { getSignedUrl } from "@/lib/supabase/services/storage";
+import {
+  getSeedDocumentDownloadUrl,
+  getSignedUrl,
+} from "@/lib/supabase/services/storage";
 import { type RiwayatItem, type SchoolDocument } from "@/lib/userDashboardData";
 import styles from "./page.module.css";
 
@@ -38,7 +41,7 @@ function resolveSchoolName(
 export default function AdminDetailDokumenPage() {
   const searchParams = useSearchParams();
   const { registeredSchools } = useAuth();
-  const { documents, bookings, histories, addToast } = useDashboard();
+  const { documents, bookings, histories, addToast, dashboardLoading } = useDashboard();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const documentId = searchParams.get("documentId");
@@ -57,6 +60,7 @@ export default function AdminDetailDokumenPage() {
   const selectedSchoolName = selectedDocument
     ? resolveSchoolName(selectedDocument, registeredSchools, bookings, histories)
     : null;
+  const shouldWaitForData = dashboardLoading && Boolean(documentId);
 
   const relatedDocuments = useMemo(() => {
     if (!selectedDocument) return [];
@@ -79,20 +83,32 @@ export default function AdminDetailDokumenPage() {
   }, [documents, selectedDocument, selectedSchoolId]);
 
   const handleDownload = async (document: SchoolDocument) => {
-    if (!document.storagePath) {
+    const seedDownloadUrl = getSeedDocumentDownloadUrl(
+      document.id,
+      document.storagePath,
+    );
+    const shouldUseSeedDownload =
+      Boolean(seedDownloadUrl) &&
+      (!document.storagePath ||
+        document.storagePath.startsWith("__seed__/") ||
+        document.storagePath.startsWith("/"));
+    if (!document.storagePath && !seedDownloadUrl) {
       addToast(`Dokumen "${document.fileName}" belum memiliki file yang bisa diunduh.`, "info");
       return;
     }
 
     setDownloadingId(document.id);
     try {
-      const signedUrl = await getSignedUrl(document.storagePath);
-      if (!signedUrl) {
+      const signedUrl = !shouldUseSeedDownload && document.storagePath
+        ? await getSignedUrl(document.storagePath)
+        : null;
+      const downloadUrl = signedUrl ?? seedDownloadUrl;
+      if (!downloadUrl) {
         addToast(`Gagal membuat link unduhan untuk "${document.fileName}".`, "error");
         return;
       }
 
-      window.open(signedUrl, "_blank", "noopener,noreferrer");
+      window.open(downloadUrl, "_blank", "noopener,noreferrer");
     } finally {
       setDownloadingId(null);
     }
@@ -115,7 +131,11 @@ export default function AdminDetailDokumenPage() {
         </p>
       </section>
 
-      {selectedDocument ? (
+      {shouldWaitForData ? (
+        <section className={styles.listCard}>
+          <p className={styles.emptyState}>Memuat detail dokumen...</p>
+        </section>
+      ) : selectedDocument ? (
         <>
           <section className={styles.metaGrid}>
             <article className={styles.metaCard}>
@@ -148,10 +168,18 @@ export default function AdminDetailDokumenPage() {
                   <span>{item.reviewStatus ?? "Menunggu Review"}</span>
                   <button
                     type="button"
-                    disabled={!item.storagePath || downloadingId === item.id}
+                    disabled={
+                      (!item.storagePath &&
+                        !getSeedDocumentDownloadUrl(item.id, item.storagePath)) ||
+                      downloadingId === item.id
+                    }
                     onClick={() => void handleDownload(item)}
                   >
-                    {downloadingId === item.id ? "Memuat..." : item.storagePath ? "Unduh" : "Tidak Tersedia"}
+                    {downloadingId === item.id
+                      ? "Memuat..."
+                      : item.storagePath || getSeedDocumentDownloadUrl(item.id, item.storagePath)
+                        ? "Unduh"
+                        : "Tidak Tersedia"}
                   </button>
                 </div>
               </article>

@@ -1,6 +1,10 @@
 import { createClient } from "../client";
 
 const BUCKET = "school-documents";
+const seedDocumentMap: Record<string, string> = {
+  "DOC-004": "/api/seed-documents/DOC-004",
+  "DOC-005": "/api/seed-documents/DOC-005",
+};
 
 export async function uploadFile(
   schoolId: string,
@@ -34,6 +38,21 @@ export async function getSignedUrl(
 
   if (error) return null;
   return data.signedUrl;
+}
+
+export function getSeedDocumentDownloadUrl(
+  documentId: string,
+  storagePath?: string | null,
+): string | null {
+  if (storagePath?.startsWith("/")) {
+    return storagePath;
+  }
+
+  if (storagePath?.startsWith("__seed__/")) {
+    return `/api/seed-documents/${encodeURIComponent(documentId)}`;
+  }
+
+  return seedDocumentMap[documentId] ?? null;
 }
 
 export async function deleteFile(path: string): Promise<void> {

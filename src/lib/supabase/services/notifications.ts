@@ -33,7 +33,7 @@ export async function insertNotification(
   notif: Omit<Notification, "isRead" | "createdAt">,
 ): Promise<Notification> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("notifications")
     .insert({
       id: notif.id,
@@ -44,12 +44,14 @@ export async function insertNotification(
       reference_id: notif.referenceId ?? null,
       reference_type: notif.referenceType ?? null,
       is_read: false,
-    })
-    .select()
-    .single();
+    });
 
   if (error) throw error;
-  return rowToNotification(data as Record<string, unknown>);
+  return {
+    ...notif,
+    isRead: false,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 export async function markRead(userId: string, notifId: string): Promise<void> {

@@ -100,9 +100,7 @@ function LoginPageContent() {
           searchParams.get("redirectTo"),
           result.redirectTo,
         );
-        setTimeout(() => {
-          router.push(redirectTo);
-        }, 500);
+        router.replace(redirectTo);
       } else {
         setIsSubmitting(false);
         setStatus("auth_error");

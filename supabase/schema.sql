@@ -30,8 +30,11 @@ create table if not exists public.profiles (
   principal_name text,
   operator_name text,
   district      text,
+  avatar_path   text,
   created_at    timestamptz not null default now()
 );
+
+alter table public.profiles add column if not exists avatar_path text;
 
 alter table public.profiles enable row level security;
 
@@ -54,6 +57,23 @@ create policy "Allow insert for own profile"
   on public.profiles for insert
   with check (auth.uid() = id);
 
+create or replace function public.normalize_booking_session_text(input text)
+returns text
+language sql
+immutable
+as $$
+  with digits as (
+    select regexp_replace(coalesce(input, ''), '[^0-9]', '', 'g') as d
+  )
+  select case
+    when length(d) >= 8 then
+      substring(d from 1 for 2) || '.' || substring(d from 3 for 2)
+      || ' - ' || substring(d from 5 for 2) || '.' || substring(d from 7 for 2) || ' WITA'
+    else trim(coalesce(input, ''))
+  end
+  from digits;
+$$;
+
 -- 2. BOOKINGS
 create table if not exists public.bookings (
   id               text primary key,
@@ -63,6 +83,7 @@ create table if not exists public.bookings (
   category         text,
   date_iso         date not null,
   session          text not null,
+  session_key      text generated always as (public.normalize_booking_session_text(session)) stored,
   status           text not null default 'Menunggu',
   timeline         jsonb not null default '[]'::jsonb,
   goal             text,
@@ -74,11 +95,21 @@ create table if not exists public.bookings (
   created_at       timestamptz not null default now()
 );
 
+alter table public.bookings
+  add column if not exists session_key text generated always as (public.normalize_booking_session_text(session)) stored;
+
 alter table public.bookings enable row level security;
 
-create unique index if not exists bookings_active_slot_unique
-  on public.bookings (date_iso, session)
+drop index if exists public.bookings_active_slot_unique;
+create unique index bookings_active_slot_unique
+  on public.bookings (date_iso, session_key)
   where status not in ('Dibatalkan', 'Ditolak');
+
+alter table public.bookings
+  drop constraint if exists bookings_session_key_format;
+alter table public.bookings
+  add constraint bookings_session_key_format
+  check (session_key ~ '^[0-2][0-9]\.[0-5][0-9] - [0-2][0-9]\.[0-5][0-9] WITA$');
 
 create policy "Schools can read own bookings"
   on public.bookings for select
@@ -121,8 +152,24 @@ create table if not exists public.documents (
   version         int default 1,
   parent_doc_id   text,
   uploaded_at     text not null,
+  uploaded_at_ts  timestamptz not null default now(),
   created_at      timestamptz not null default now()
 );
+
+alter table public.documents
+  add column if not exists uploaded_at_ts timestamptz not null default now();
+
+create index if not exists documents_parent_doc_idx
+  on public.documents (parent_doc_id);
+
+alter table public.documents
+  drop constraint if exists documents_parent_doc_fk;
+alter table public.documents
+  add constraint documents_parent_doc_fk
+  foreign key (parent_doc_id)
+  references public.documents(id)
+  on delete set null
+  not valid;
 
 alter table public.documents enable row level security;
 
@@ -252,7 +299,7 @@ security definer set search_path = ''
 as $$
 begin
   insert into public.profiles (
-    id, role, school_name, npsn, contact_name, email, phone, address
+    id, role, school_name, npsn, contact_name, email, phone, address, avatar_path
   )
   values (
     new.id,
@@ -262,7 +309,8 @@ begin
     new.raw_user_meta_data ->> 'contact_name',
     new.email,
     new.raw_user_meta_data ->> 'phone',
-    new.raw_user_meta_data ->> 'address'
+    new.raw_user_meta_data ->> 'address',
+    new.raw_user_meta_data ->> 'avatar_path'
   );
   return new;
 end;

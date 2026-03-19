@@ -10,11 +10,14 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import type { User } from "@supabase/supabase-js";
 import {
   signIn as supaSignIn,
   signUp as supaSignUp,
   signOut as supaSignOut,
+  changePassword as supaChangePassword,
   getProfile,
+  updateUserMetadata as supaUpdateUserMetadata,
   type SignUpPayload,
 } from "./supabase/services/auth";
 import {
@@ -30,6 +33,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: UserRole;
+  avatarPath?: string;
 }
 
 export interface RegisterInput {
@@ -46,6 +50,14 @@ export interface RegisteredSchool extends RegisterInput {
   id: string;
 }
 
+interface ProfileSnapshot {
+  role?: string | null;
+  school_name?: string | null;
+  contact_name?: string | null;
+  email?: string | null;
+  avatar_path?: string | null;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
@@ -53,6 +65,8 @@ interface AuthContextValue {
   registeredSchools: RegisteredSchool[];
   login(identity: string, password: string): Promise<{ success: boolean; error?: string; redirectTo: string }>;
   register(data: RegisterInput): Promise<{ success: boolean; error?: string }>;
+  changePassword(currentPassword: string, nextPassword: string): Promise<{ success: boolean; error?: string }>;
+  updateAvatarPath(nextPath: string): Promise<{ success: boolean; error?: string }>;
   logout(): Promise<void>;
   refreshSchools(): Promise<void>;
 }
@@ -111,6 +125,35 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
+function buildAuthUser(
+  user: User,
+  profile?: ProfileSnapshot | null,
+): AuthUser {
+  const metadata = user.user_metadata as {
+    role?: string;
+    school_name?: string;
+    contact_name?: string;
+    avatar_path?: string;
+  } | undefined;
+
+  const role = (profile?.role ?? metadata?.role ?? "school") as UserRole;
+  const name =
+    profile?.school_name ??
+    profile?.contact_name ??
+    metadata?.school_name ??
+    metadata?.contact_name ??
+    user.email ??
+    "User";
+
+  return {
+    id: user.id,
+    email: user.email ?? profile?.email ?? "",
+    name,
+    role,
+    avatarPath: profile?.avatar_path ?? metadata?.avatar_path,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(!isE2EMode);
@@ -156,6 +199,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const syncUserProfile = useCallback(
+    async (nextUser: User) => {
+      const profile = await getProfile(nextUser.id);
+      const resolvedUser = buildAuthUser(nextUser, profile);
+      setUser(resolvedUser);
+      writeE2EUser(resolvedUser);
+
+      if (resolvedUser.role === "admin") {
+        await refreshSchools();
+      } else {
+        setRegisteredSchools([]);
+      }
+
+      return resolvedUser;
+    },
+    [refreshSchools],
+  );
+
   useEffect(() => {
     if (isE2EMode) {
       return;
@@ -165,21 +226,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const profile = await getProfile(session.user.id);
-        if (profile) {
-          const nextRole = profile.role as UserRole;
-          setUser({
-            id: session.user.id,
-            email: session.user.email ?? profile.email,
-            name: profile.school_name ?? profile.contact_name ?? "User",
-            role: nextRole,
-          });
-          if (nextRole === "admin") {
-            await refreshSchools();
-          } else {
-            setRegisteredSchools([]);
+        const optimisticUser = buildAuthUser(session.user);
+        setUser(optimisticUser);
+        setLoading(false);
+        void syncUserProfile(session.user).catch(() => {
+          if (optimisticUser.role === "admin") {
+            void refreshSchools();
           }
-        }
+        });
+        return;
       }
       setLoading(false);
     });
@@ -190,30 +245,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_OUT" || !session?.user) {
         setUser(null);
         setRegisteredSchools([]);
+        writeE2EUser(null);
         return;
       }
 
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        const profile = await getProfile(session.user.id);
-        if (profile) {
-          const nextRole = profile.role as UserRole;
-          setUser({
-            id: session.user.id,
-            email: session.user.email ?? profile.email,
-            name: profile.school_name ?? profile.contact_name ?? "User",
-            role: nextRole,
-          });
-          if (nextRole === "admin") {
-            await refreshSchools();
-          } else {
-            setRegisteredSchools([]);
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        const optimisticUser = buildAuthUser(session.user);
+        setUser(optimisticUser);
+        void syncUserProfile(session.user).catch(() => {
+          if (optimisticUser.role === "admin") {
+            void refreshSchools();
           }
-        }
+        });
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [refreshSchools]);
+  }, [refreshSchools, syncUserProfile]);
 
   const login = useCallback(
     async (
@@ -226,32 +274,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (result.user) {
-        const profile = await getProfile(result.user.id);
-        const role = (profile?.role ?? "school") as UserRole;
-        setUser({
-          id: result.user.id,
-          email: result.user.email ?? identity,
-          name: profile?.school_name ?? profile?.contact_name ?? "User",
-          role,
-        });
-        writeE2EUser({
-          id: result.user.id,
-          email: result.user.email ?? identity,
-          name: profile?.school_name ?? profile?.contact_name ?? "User",
-          role,
-        });
-        if (role === "admin") {
-          await refreshSchools();
-        } else {
+        const optimisticUser = buildAuthUser(result.user);
+        setUser(optimisticUser);
+        writeE2EUser(optimisticUser);
+        if (optimisticUser.role !== "admin") {
           setRegisteredSchools([]);
         }
-        const redirectTo = role === "admin" ? "/dashboard-admin" : "/dashboard/ringkasan";
+        void syncUserProfile(result.user).catch(() => {
+          if (optimisticUser.role === "admin") {
+            void refreshSchools();
+          }
+        });
+        const redirectTo = optimisticUser.role === "admin" ? "/dashboard-admin" : "/dashboard/ringkasan";
         return { success: true, redirectTo };
       }
 
       return { success: false, error: "Terjadi kesalahan.", redirectTo: "" };
     },
-    [refreshSchools],
+    [refreshSchools, syncUserProfile],
   );
 
   const register = useCallback(
@@ -275,8 +315,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const changePassword = useCallback(
+    async (
+      currentPassword: string,
+      nextPassword: string,
+    ): Promise<{ success: boolean; error?: string }> => {
+      const result = await supaChangePassword(currentPassword, nextPassword);
+      if (result.error) {
+        return { success: false, error: result.error };
+      }
+
+      return { success: true };
+    },
+    [],
+  );
+
+  const updateAvatarPath = useCallback(
+    async (nextPath: string): Promise<{ success: boolean; error?: string }> => {
+      const result = await supaUpdateUserMetadata({ avatar_path: nextPath });
+      if (result.error) {
+        return { success: false, error: result.error };
+      }
+
+      if (result.user) {
+        const nextAuthUser = buildAuthUser(result.user);
+        setUser(nextAuthUser);
+        writeE2EUser(nextAuthUser);
+      }
+
+      return { success: true };
+    },
+    [],
+  );
+
   const logout = useCallback(async () => {
-    await supaSignOut();
+    const result = await supaSignOut();
+    if (result.error) {
+      console.error("logout error:", result.error);
+      throw new Error(result.error);
+    }
+
     setUser(null);
     setRegisteredSchools([]);
     writeE2EUser(null);
@@ -290,10 +368,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       registeredSchools,
       login,
       register,
+      changePassword,
+      updateAvatarPath,
       logout,
       refreshSchools,
     }),
-    [authLoading, authUser, registeredSchools, login, register, logout, refreshSchools],
+    [authLoading, authUser, registeredSchools, login, register, changePassword, updateAvatarPath, logout, refreshSchools],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

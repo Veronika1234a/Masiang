@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useDashboard } from "@/lib/DashboardContext";
-import { getSignedUrl } from "@/lib/supabase/services/storage";
+import {
+  getSeedDocumentDownloadUrl,
+  getSignedUrl,
+} from "@/lib/supabase/services/storage";
 import {
   formatLongDateID,
   getDateDiffFromToday,
@@ -36,9 +39,19 @@ function getFollowUpLabel(dateISO?: string) {
 
 export default function HistoryDetailPage() {
   const params = useParams<{ historyId: string }>();
-  const { histories, documents, toggleFollowUpItem, markFollowUpDone, addToast } = useDashboard();
+  const { histories, documents, toggleFollowUpItem, markFollowUpDone, addToast, dashboardLoading } = useDashboard();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const history = histories.find((h) => h.id === params.historyId);
+
+  if (dashboardLoading) {
+    return (
+      <main className="text-[#121d35] w-full pb-10">
+        <div className="mx-auto max-w-[800px] text-center py-20">
+          <h1 className="font-[var(--font-fraunces)] text-3xl font-medium">Memuat riwayat...</h1>
+        </div>
+      </main>
+    );
+  }
 
   if (!history) {
     return (
@@ -57,20 +70,32 @@ export default function HistoryDetailPage() {
 
   const handleDownload = async (documentId: string, fileName: string) => {
     const fullDocument = documents.find((item) => item.id === documentId);
-    if (!fullDocument?.storagePath) {
+    const seedDownloadUrl = getSeedDocumentDownloadUrl(
+      documentId,
+      fullDocument?.storagePath,
+    );
+    const shouldUseSeedDownload =
+      Boolean(seedDownloadUrl) &&
+      (!fullDocument?.storagePath ||
+        fullDocument.storagePath.startsWith("__seed__/") ||
+        fullDocument.storagePath.startsWith("/"));
+    if (!fullDocument?.storagePath && !seedDownloadUrl) {
       addToast(`Dokumen "${fileName}" belum tersedia untuk diunduh.`, "info");
       return;
     }
 
     setDownloadingId(documentId);
     try {
-      const signedUrl = await getSignedUrl(fullDocument.storagePath);
-      if (!signedUrl) {
+      const signedUrl = !shouldUseSeedDownload && fullDocument?.storagePath
+        ? await getSignedUrl(fullDocument.storagePath)
+        : null;
+      const downloadUrl = signedUrl ?? seedDownloadUrl;
+      if (!downloadUrl) {
         addToast(`Gagal membuat link unduhan untuk "${fileName}".`, "error");
         return;
       }
 
-      window.open(signedUrl, "_blank", "noopener,noreferrer");
+      window.open(downloadUrl, "_blank", "noopener,noreferrer");
     } finally {
       setDownloadingId(null);
     }
@@ -190,8 +215,8 @@ export default function HistoryDetailPage() {
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                       <span className={`inline-flex rounded-md px-3 py-1.5 text-[11px] font-bold uppercase ${getCategoryClasses(doc.category)}`}>{doc.category}</span>
-                      <button type="button" disabled={!linkedDocument?.storagePath || downloadingId === doc.id} onClick={() => void handleDownload(doc.id, doc.fileName)} className="rounded-lg border border-[#cfd5e6] bg-[#f9f8fc] px-3 py-2 text-[12px] font-bold uppercase text-[#4f5b77] hover:bg-[#eef1f8] disabled:cursor-not-allowed disabled:opacity-50">
-                        {downloadingId === doc.id ? "Memuat..." : linkedDocument?.storagePath ? "Unduh" : "Tidak Tersedia"}
+                      <button type="button" disabled={(!linkedDocument?.storagePath && !getSeedDocumentDownloadUrl(doc.id, linkedDocument?.storagePath)) || downloadingId === doc.id} onClick={() => void handleDownload(doc.id, doc.fileName)} className="rounded-lg border border-[#cfd5e6] bg-[#f9f8fc] px-3 py-2 text-[12px] font-bold uppercase text-[#4f5b77] hover:bg-[#eef1f8] disabled:cursor-not-allowed disabled:opacity-50">
+                        {downloadingId === doc.id ? "Memuat..." : linkedDocument?.storagePath || getSeedDocumentDownloadUrl(doc.id, linkedDocument?.storagePath) ? "Unduh" : "Tidak Tersedia"}
                       </button>
                     </div>
                   </article>

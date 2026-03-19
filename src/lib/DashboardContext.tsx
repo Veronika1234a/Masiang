@@ -16,6 +16,7 @@ import {
   getFormattedNow,
   getFormattedToday,
   getTodayISO,
+  normalizeBookingSession,
   type BookingItem,
   type BookingTimelineItem,
   type DocumentReviewStatus,
@@ -163,15 +164,19 @@ function calcProgress(documents: SchoolDocument[]): StageProgress {
 
 // ─── ID Generators (client-side, matching readable format) ───
 
-let idCounter = Date.now();
 function nextId(prefix: string): string {
-  idCounter += 1;
-  return `${prefix}-${String(idCounter % 100000).padStart(3, "0")}`;
+  const randomPart =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()
+      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
+
+  return `${prefix}-${randomPart}`;
 }
 
 const emptyProfile: SchoolProfile = {
   schoolName: "",
   npsn: "",
+  contactName: "",
   educationLevel: "",
   address: "",
   officialEmail: "",
@@ -218,11 +223,20 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     () => notifications.filter((n) => !n.isRead).length,
     [notifications],
   );
+  const clearDashboardState = useCallback(() => {
+    setBookings([]);
+    setDocuments([]);
+    setHistories([]);
+    setProfile(emptyProfile);
+    setNotifications([]);
+    setLoadedDashboardUserId(null);
+  }, []);
 
   // ─── Fetch all data when user is available ───
 
   useEffect(() => {
     if (!user) {
+      clearDashboardState();
       return;
     }
 
@@ -230,34 +244,55 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
     const isAdmin = user.role === "admin";
     const schoolId = isAdmin ? undefined : user.id;
+    setLoadedDashboardUserId(null);
 
-    Promise.all([
+    void Promise.allSettled([
       bookingSvc.fetchBookings(schoolId),
       docSvc.fetchDocuments(schoolId),
       historySvc.fetchHistories(schoolId),
       profileSvc.fetchProfile(user.id),
       notifSvc.fetchNotifications(user.id),
     ])
-      .then(([b, d, h, p, n]) => {
+      .then(([bookingResult, documentResult, historyResult, profileResult, notifResult]) => {
         if (cancelled) return;
 
-        setBookings(b);
-        setDocuments(d);
-        setHistories(attachDocumentsToHistories(h, d));
-        setProfile(p ?? emptyProfile);
-        setNotifications(n);
+        const nextBookings = bookingResult.status === "fulfilled" ? bookingResult.value : [];
+        const nextDocuments = documentResult.status === "fulfilled" ? documentResult.value : [];
+        const nextHistories = historyResult.status === "fulfilled" ? historyResult.value : [];
+        const nextProfile =
+          profileResult.status === "fulfilled" ? profileResult.value ?? emptyProfile : emptyProfile;
+        const nextNotifications = notifResult.status === "fulfilled" ? notifResult.value : [];
+
+        setBookings(nextBookings);
+        setDocuments(nextDocuments);
+        setHistories(attachDocumentsToHistories(nextHistories, nextDocuments));
+        setProfile(nextProfile);
+        setNotifications(nextNotifications);
         setLoadedDashboardUserId(user.id);
+
+        const failedResources = [
+          bookingResult.status === "rejected" ? "bookings" : null,
+          documentResult.status === "rejected" ? "documents" : null,
+          historyResult.status === "rejected" ? "histories" : null,
+          profileResult.status === "rejected" ? "profile" : null,
+          notifResult.status === "rejected" ? "notifications" : null,
+        ].filter(Boolean);
+
+        if (failedResources.length > 0) {
+          console.error("Dashboard partial fetch error:", failedResources.join(", "));
+        }
       })
       .catch((err) => {
         if (cancelled) return;
         console.error("Dashboard fetch error:", err);
+        clearDashboardState();
         setLoadedDashboardUserId(user.id);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, clearDashboardState]);
 
   useEffect(() => {
     if (!user) {
@@ -377,6 +412,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     async (data: NewBookingInput): Promise<BookingItem> => {
       if (!user) throw new Error("Not authenticated");
       const id = nextId("BK");
+      const normalizedSession = normalizeBookingSession(data.session);
       const newBooking: BookingItem = {
         id,
         schoolId: user.id,
@@ -384,7 +420,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         topic: data.topic,
         category: data.category as BookingItem["category"],
         dateISO: data.date,
-        session: data.session,
+        session: normalizedSession,
         status: "Menunggu",
         goal: data.goal,
         notes: data.notes,
@@ -431,7 +467,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       );
 
       try {
-        await bookingSvc.updateBooking(id, { status: "Dibatalkan", cancel_reason: reason });
+        await bookingSvc.updateBooking(
+          id,
+          { status: "Dibatalkan", cancel_reason: reason },
+          { expectedStatuses: ["Menunggu", "Disetujui"] },
+        );
       } catch (err) {
         console.error("cancelBooking error:", err);
         setBookings(previousBookings);
@@ -467,6 +507,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       if (matchedBooking.status === "Selesai" || existingHistory) {
         addToast(`Sesi ${id} sudah selesai.`, "info");
         return existingHistory?.id ?? null;
+      }
+
+      if (matchedBooking.status !== "Dalam Proses") {
+        addToast(`Sesi ${id} tidak berada pada status Dalam Proses.`, "info");
+        return null;
       }
 
       if (completingBookingIdsRef.current.has(id)) {
@@ -536,7 +581,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           await bookingSvc.updateBooking(id, {
             status: "Selesai",
             timeline: doneTimeline as BookingTimelineItem[],
-          });
+          }, { expectedStatuses: ["Dalam Proses"] });
           await historySvc.insertHistory(schoolId, newHistory);
           await docSvc.updateDocumentsHistoryId(matchedBooking.id, historyId);
         } catch (err) {
@@ -608,46 +653,59 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
       const id = nextId("DOC");
       let storagePath: string | undefined;
-
-      if (file) {
-        const { path, error } = await storageSvc.uploadFile(user.id, file, fileName);
-        if (error) throw new Error(error);
-        storagePath = path;
-      }
-
-      const doc: SchoolDocument = {
-        id,
-        schoolId: user.id,
-        fileName,
-        uploadedAt: getFormattedToday(),
-        stage,
-        fileSize,
-        mimeType,
-        bookingId,
-        reviewStatus: "Menunggu Review",
-        version: 1,
-        storagePath,
-      };
-
-      setDocuments((prev) => [doc, ...prev]);
-
       try {
+        if (file) {
+          const uploadResult = await storageSvc.uploadFile(user.id, file, fileName);
+          if (uploadResult.error) {
+            throw new Error(uploadResult.error);
+          }
+          storagePath = uploadResult.path;
+        }
+
+        const doc: SchoolDocument = {
+          id,
+          schoolId: user.id,
+          fileName,
+          uploadedAt: getFormattedToday(),
+          stage,
+          fileSize,
+          mimeType,
+          bookingId,
+          reviewStatus: "Menunggu Review",
+          version: 1,
+          storagePath,
+        };
+
+        setDocuments((prev) => [doc, ...prev]);
         await docSvc.insertDocument(user.id, doc);
+
+        await pushNotif(
+          "Dokumen Diunggah",
+          `Dokumen "${fileName}" berhasil diunggah.`,
+          "doc_uploaded",
+          id,
+          "document",
+          [user.id],
+        );
+        addToast(`Dokumen "${fileName}" berhasil diunggah.`);
+        return doc;
       } catch (err) {
-        setDocuments((prev) => prev.filter((d) => d.id !== id));
+        setDocuments((prev) => prev.filter((item) => item.id !== id));
+        if (storagePath) {
+          try {
+            await storageSvc.deleteFile(storagePath);
+          } catch (cleanupError) {
+            console.error("uploadDocument cleanup error:", cleanupError);
+          }
+        }
+
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : `Gagal mengunggah dokumen "${fileName}".`;
+        addToast(message, "error");
         throw err;
       }
-
-      await pushNotif(
-        "Dokumen Diunggah",
-        `Dokumen "${fileName}" berhasil diunggah.`,
-        "doc_uploaded",
-        id,
-        "document",
-        [user.id],
-      );
-      addToast(`Dokumen "${fileName}" berhasil diunggah.`);
-      return doc;
     },
     [user, pushNotif, addToast],
   );
@@ -711,58 +769,68 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const previousDocuments = documents;
       const previousHistories = histories;
       const newId = nextId("DOC");
-
       let storagePath: string | undefined;
-      if (file) {
-        const { path, error } = await storageSvc.uploadFile(user.id, file, fileName);
-        if (error) throw new Error(error);
-        storagePath = path;
-      }
-
-      const doc: SchoolDocument = {
-        id: newId,
-        schoolId: existing?.schoolId ?? user.id,
-        fileName,
-        uploadedAt: getFormattedToday(),
-        stage: existing?.stage ?? "Melayani",
-        fileSize,
-        mimeType,
-        bookingId: existing?.bookingId,
-        historyId: existing?.historyId,
-        reviewStatus: "Menunggu Review",
-        version: (existing?.version ?? 0) + 1,
-        parentDocId: id,
-        storagePath,
-      };
-
-      setDocuments((prev) => prev.map((d) => (d.id === id ? doc : d)));
-      if (existing?.historyId) {
-        setHistories((prev) =>
-          prev.map((history) =>
-            history.id === existing.historyId
-              ? {
-                  ...history,
-                  documents: history.documents.map((historyDoc) =>
-                    historyDoc.id === id
-                      ? {
-                          id: newId,
-                          fileName,
-                          category: historyDoc.category,
-                          uploadedAt: doc.uploadedAt,
-                        }
-                      : historyDoc,
-                  ),
-                }
-              : history,
-          ),
-        );
-      }
 
       try {
-        await docSvc.insertDocument(user.id, doc);
-        if (existing) {
-          await docSvc.deleteDocument(id);
+        if (file) {
+          const uploadResult = await storageSvc.uploadFile(user.id, file, fileName);
+          if (uploadResult.error) {
+            throw new Error(uploadResult.error);
+          }
+          storagePath = uploadResult.path;
         }
+
+        const doc: SchoolDocument = {
+          id: newId,
+          schoolId: existing?.schoolId ?? user.id,
+          fileName,
+          uploadedAt: getFormattedToday(),
+          stage: existing?.stage ?? "Melayani",
+          fileSize,
+          mimeType,
+          bookingId: existing?.bookingId,
+          historyId: existing?.historyId,
+          reviewStatus: "Menunggu Review",
+          version: (existing?.version ?? 0) + 1,
+          parentDocId: id,
+          storagePath,
+        };
+
+        setDocuments((prev) => [doc, ...prev.filter((d) => d.id !== id)]);
+        if (existing?.historyId) {
+          setHistories((prev) =>
+            prev.map((history) =>
+              history.id === existing.historyId
+                ? {
+                    ...history,
+                    documents: history.documents.map((historyDoc) =>
+                      historyDoc.id === id
+                        ? {
+                            id: newId,
+                            fileName,
+                            category: historyDoc.category,
+                            uploadedAt: doc.uploadedAt,
+                          }
+                        : historyDoc,
+                    ),
+                  }
+                : history,
+            ),
+          );
+        }
+
+        await docSvc.insertDocument(user.id, doc);
+
+        await pushNotif(
+          "Dokumen Diperbarui",
+          `Revisi dokumen "${fileName}" berhasil diunggah.`,
+          "doc_uploaded",
+          newId,
+          "document",
+          [user.id],
+        );
+        addToast(`Revisi "${fileName}" berhasil diunggah.`);
+        return doc;
       } catch (err) {
         console.error("replaceDocument error:", err);
         if (storagePath) {
@@ -774,29 +842,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         }
         setDocuments(previousDocuments);
         setHistories(previousHistories);
-        addToast(`Gagal mengunggah revisi "${fileName}".`, "error");
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : `Gagal mengunggah revisi "${fileName}".`;
+        addToast(message, "error");
         throw err;
       }
-
-      if (existing?.storagePath) {
-        try {
-          await storageSvc.deleteFile(existing.storagePath);
-        } catch (err) {
-          console.error("replaceDocument storage cleanup error:", err);
-          addToast(`Revisi "${fileName}" tersimpan, tetapi file lama belum berhasil dibersihkan dari storage.`, "info");
-        }
-      }
-
-      await pushNotif(
-        "Dokumen Diperbarui",
-        `Revisi dokumen "${fileName}" berhasil diunggah.`,
-        "doc_uploaded",
-        newId,
-        "document",
-        [user.id],
-      );
-      addToast(`Revisi "${fileName}" berhasil diunggah.`);
-      return doc;
     },
     [user, documents, histories, pushNotif, addToast],
   );
@@ -950,6 +1002,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       if (!booking) {
         return;
       }
+      if (booking.status !== "Menunggu") {
+        addToast(`Booking ${id} tidak bisa disetujui dari status ${booking.status}.`, "info");
+        return;
+      }
 
       const newTimeline = booking?.timeline.map((t, i) =>
         i <= 1
@@ -975,7 +1031,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         await bookingSvc.updateBooking(id, {
           status: "Disetujui",
           timeline: newTimeline as BookingTimelineItem[],
-        });
+        }, { expectedStatuses: ["Menunggu"] });
       } catch (err) {
         console.error("approveBooking error:", err);
         setBookings(bookings);
@@ -1002,6 +1058,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       if (!booking) {
         return;
       }
+      if (booking.status !== "Menunggu") {
+        addToast(`Booking ${id} tidak bisa ditolak dari status ${booking.status}.`, "info");
+        return;
+      }
 
       setBookings((prev) =>
         prev.map((b) =>
@@ -1010,7 +1070,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       );
 
       try {
-        await bookingSvc.updateBooking(id, { status: "Ditolak", cancel_reason: reason });
+        await bookingSvc.updateBooking(
+          id,
+          { status: "Ditolak", cancel_reason: reason },
+          { expectedStatuses: ["Menunggu"] },
+        );
       } catch (err) {
         console.error("rejectBooking error:", err);
         setBookings(bookings);
@@ -1037,6 +1101,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       if (!booking) {
         return;
       }
+      if (booking.status !== "Disetujui") {
+        addToast(`Booking ${id} tidak bisa dimulai dari status ${booking.status}.`, "info");
+        return;
+      }
 
       const newTimeline = booking?.timeline.map((t, i) =>
         i <= 2
@@ -1060,7 +1128,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         await bookingSvc.updateBooking(id, {
           status: "Dalam Proses",
           timeline: newTimeline as BookingTimelineItem[],
-        });
+        }, { expectedStatuses: ["Disetujui"] });
       } catch (err) {
         console.error("startSession error:", err);
         setBookings(bookings);
@@ -1071,7 +1139,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       await pushNotif(
         "Sesi Dimulai",
         `Sesi pendampingan ${id} telah dimulai.`,
-        "booking_approved",
+        "booking_started",
         id,
         "booking",
         booking?.schoolId ? [booking.schoolId] : undefined,

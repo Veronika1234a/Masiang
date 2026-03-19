@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { useDashboard } from "@/lib/DashboardContext";
+import { openBookingPrintReport } from "@/lib/bookingPrint";
 import { formatLongDateID, type BookingStatus } from "@/lib/userDashboardData";
 
 function getStatusBadgeClasses(status: BookingStatus) {
@@ -18,7 +19,7 @@ function getStatusBadgeClasses(status: BookingStatus) {
 
 export default function BookingDetailPage() {
   const params = useParams<{ bookingId: string }>();
-  const { bookings, documents, histories, rateBooking, uploadDocument, cancelBooking } = useDashboard();
+  const { bookings, documents, histories, rateBooking, uploadDocument, cancelBooking, addToast, dashboardLoading } = useDashboard();
   const booking = bookings.find((b) => b.id === params.bookingId);
 
   const [ratingValue, setRatingValue] = useState(0);
@@ -26,7 +27,18 @@ export default function BookingDetailPage() {
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  if (dashboardLoading) {
+    return (
+      <main className="text-[#121d35] w-full pb-10">
+        <div className="mx-auto max-w-[800px] text-center py-20">
+          <h1 className="font-[var(--font-fraunces)] text-3xl font-medium text-[#121d35]">Memuat booking...</h1>
+        </div>
+      </main>
+    );
+  }
 
   if (!booking) {
     return (
@@ -44,6 +56,7 @@ export default function BookingDetailPage() {
   const linkedHistoryId = histories.find((h) => h.bookingId === booking.id)?.id ?? null;
   const canRate = booking.status === "Selesai" && !booking.rating && !ratingSubmitted;
   const canCancel = booking.status === "Menunggu" || booking.status === "Disetujui";
+  const activeTimelineItem = booking.timeline.find((item) => item.status === "active") ?? null;
 
   const handleRate = async () => {
     if (ratingValue > 0) {
@@ -58,8 +71,22 @@ export default function BookingDetailPage() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    for (const file of files) {
-      await uploadDocument(file.name, "Pelaksanaan", file.size, file.type, booking.id, file);
+    if (files.length === 0) {
+      e.target.value = "";
+      return;
+    }
+
+    setIsUploadingDoc(true);
+    try {
+      for (const file of files) {
+        try {
+          await uploadDocument(file.name, "Pelaksanaan", file.size, file.type, booking.id, file);
+        } catch {
+          // Error toast is handled in context.
+        }
+      }
+    } finally {
+      setIsUploadingDoc(false);
     }
     e.target.value = "";
   };
@@ -107,6 +134,23 @@ export default function BookingDetailPage() {
           <div className="flex flex-col gap-1.5 md:border-l md:border-[#cfd5e6] md:pl-6">
             <span className="text-[11px] font-bold uppercase tracking-wide text-[#6d7998]">Waktu</span>
             <p className="text-[14px] font-semibold text-[#25365f]">{booking.session}</p>
+          </div>
+        </section>
+
+        <section className="mb-8 rounded-2xl border border-[#e1dce8] bg-white p-5 shadow-sm">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#6d7998]">Status Sesi</p>
+              <p className="mt-2 text-[15px] font-semibold text-[#25365f]">{booking.status}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#6d7998]">Tahap Aktif</p>
+              <p className="mt-2 text-[15px] font-semibold text-[#25365f]">{activeTimelineItem?.title ?? "Menunggu pembaruan admin"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#6d7998]">Upload Terkait</p>
+              <p className="mt-2 text-[15px] font-semibold text-[#25365f]">Tahap Pelaksanaan</p>
+            </div>
           </div>
         </section>
 
@@ -179,12 +223,17 @@ export default function BookingDetailPage() {
             {(booking.status === "Dalam Proses" || booking.status === "Disetujui") && (
               <>
                 <input ref={fileRef} type="file" multiple onChange={handleFileUpload} className="hidden" />
-                <button type="button" onClick={() => fileRef.current?.click()} className="rounded-lg border border-[#c79a3c] bg-[#d2ac50] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-white hover:bg-[#b8933d]">
-                  Upload
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={isUploadingDoc} className="rounded-lg border border-[#c79a3c] bg-[#d2ac50] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-white hover:bg-[#b8933d] disabled:cursor-not-allowed disabled:opacity-60">
+                  {isUploadingDoc ? "Mengunggah..." : "Upload"}
                 </button>
               </>
             )}
           </div>
+          {(booking.status === "Dalam Proses" || booking.status === "Disetujui") && (
+            <p className="mb-4 text-[12px] text-[#6d7998]">
+              Dokumen dari halaman ini otomatis disimpan ke tahap <span className="font-bold text-[#25365f]">Pelaksanaan</span> untuk sesi {booking.session}.
+            </p>
+          )}
           {relatedDocs.length > 0 ? (
             <div className="flex flex-col rounded-xl border border-[#e1dce8] bg-white overflow-hidden shadow-sm">
               {relatedDocs.map((doc, i) => (
@@ -260,7 +309,17 @@ export default function BookingDetailPage() {
           <Link href={linkedHistoryId ? `/dashboard/riwayat/${linkedHistoryId}` : "/dashboard/riwayat"} className="flex-1 rounded-lg bg-[#d2ac50] px-4 py-3 text-center text-[13px] font-bold text-white transition-colors hover:bg-[#b8933d]">
             Lihat Riwayat Sesi
           </Link>
-          <button type="button" onClick={() => window.print()} className="flex-1 rounded-lg border border-[#cfd5e6] bg-white px-4 py-3 text-center text-[13px] font-bold text-[#4f5b77] transition-colors hover:bg-[#eef1f8]">
+          <button type="button" onClick={() => {
+            const opened = openBookingPrintReport({
+              booking,
+              documents: relatedDocs,
+              history: histories.find((item) => item.bookingId === booking.id) ?? null,
+            });
+
+            if (!opened) {
+              addToast("Popup cetak diblokir browser. Izinkan popup lalu coba lagi.", "error");
+            }
+          }} className="flex-1 rounded-lg border border-[#cfd5e6] bg-white px-4 py-3 text-center text-[13px] font-bold text-[#4f5b77] transition-colors hover:bg-[#eef1f8]">
             Cetak
           </button>
         </section>

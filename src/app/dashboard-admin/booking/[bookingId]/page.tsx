@@ -20,7 +20,7 @@ function getStatusClasses(status: string) {
 
 export default function AdminBookingDetailPage({ params }: { params: Promise<{ bookingId: string }> }) {
   const { bookingId } = use(params);
-  const { bookings, documents, approveBooking, rejectBooking, startSession, confirmBookingDone, addSupervisorNotes } = useDashboard();
+  const { bookings, documents, approveBooking, rejectBooking, startSession, confirmBookingDone, addSupervisorNotes, dashboardLoading } = useDashboard();
 
   const booking = bookings.find((b) => b.id === bookingId);
   const relatedDocs = documents.filter((d) => d.bookingId === bookingId);
@@ -30,6 +30,21 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ b
   const [notesModal, setNotesModal] = useState(false);
   const [supervisorNotes, setSupervisorNotes] = useState(booking?.supervisorNotes ?? "");
   const [busyActionKey, setBusyActionKey] = useState<string | null>(null);
+
+  if (dashboardLoading) {
+    return (
+      <div className="space-y-4">
+        <nav className="text-[12px] font-bold text-[#6d7998]">
+          <Link href="/dashboard-admin/booking" className="hover:text-[#25365f]">Kelola Booking</Link>
+          <span className="mx-1.5">/</span>
+          <span className="text-[#25365f]">{bookingId}</span>
+        </nav>
+        <div className="rounded-2xl border border-[#e1dce8] bg-white p-12 text-center">
+          <p className="text-[15px] text-[#6d7998]">Memuat booking...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!booking) {
     return (

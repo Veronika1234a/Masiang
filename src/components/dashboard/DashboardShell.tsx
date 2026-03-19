@@ -50,10 +50,17 @@ function getNavIcon(label: string) {
 }
 
 function getNotifIcon(type: string) {
-  if (type.startsWith("booking_approved") || type === "stage_advanced")
+  if (type === "booking_approved" || type === "stage_advanced")
     return (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M20 6L9 17l-5-5" />
+      </svg>
+    );
+  if (type === "booking_started")
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M10 8l6 4-6 4V8Z" fill="#2563eb" stroke="none" />
       </svg>
     );
   if (type === "booking_rejected" || type === "booking_cancelled")
@@ -88,7 +95,8 @@ function getNotifIcon(type: string) {
 }
 
 function getNotifIconBg(type: string) {
-  if (type.startsWith("booking_approved") || type === "stage_advanced") return "bg-[#ecfdf5]";
+  if (type === "booking_approved" || type === "stage_advanced") return "bg-[#ecfdf5]";
+  if (type === "booking_started") return "bg-[#eff6ff]";
   if (type === "booking_rejected" || type === "booking_cancelled") return "bg-[#fef2f2]";
   if (type.startsWith("doc")) return "bg-[#eff6ff]";
   if (type === "follow_up_reminder") return "bg-[#fffbeb]";
@@ -218,11 +226,31 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const pathname = usePathname();
   const { logout } = useAuth();
-  const { profile } = useDashboard();
+  const { profile, addToast } = useDashboard();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const activeNav = [...navItems]
     .sort((a, b) => b.href.length - a.href.length)
     .find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      window.location.replace("/login");
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Logout gagal. Coba lagi.";
+      addToast(message, "error");
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <div className={styles.shell}>
@@ -264,17 +292,15 @@ export function DashboardShell({
           </div>
           <button
             type="button"
-            onClick={async () => {
-              await logout();
-              window.location.assign("/login");
-            }}
+            onClick={handleLogout}
             className={styles.logout}
             aria-label="Logout"
+            disabled={isLoggingOut}
           >
             <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
               <path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3Zm4.59 4.41L13.17 8.83 15.34 11H8v2h7.34l-2.17 2.17 1.42 1.42L19.17 12l-4.58-4.59Z" fill="currentColor" />
             </svg>
-            <span>Logout</span>
+            <span>{isLoggingOut ? "Keluar..." : "Logout"}</span>
           </button>
         </div>
       </aside>

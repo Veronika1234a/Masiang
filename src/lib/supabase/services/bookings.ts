@@ -3,6 +3,7 @@ import type {
   BookingItem,
   BookingTimelineItem,
 } from "../../userDashboardData";
+import { normalizeBookingSession } from "../../userDashboardData";
 import type { Json } from "../types";
 
 function rowToBooking(row: Record<string, unknown>): BookingItem {
@@ -47,6 +48,7 @@ export async function insertBooking(
   booking: BookingItem,
 ): Promise<BookingItem> {
   const supabase = createClient();
+  const normalizedSession = normalizeBookingSession(booking.session);
   const { data, error } = await supabase
     .from("bookings")
     .insert({
@@ -56,7 +58,7 @@ export async function insertBooking(
       topic: booking.topic,
       category: booking.category ?? null,
       date_iso: booking.dateISO,
-      session: booking.session,
+      session: normalizedSession,
       status: booking.status,
       timeline: booking.timeline as unknown as Json,
       goal: booking.goal ?? null,
@@ -87,6 +89,9 @@ export async function updateBooking(
     feedback: string;
     supervisor_notes: string;
   }>,
+  options?: {
+    expectedStatuses?: string[];
+  },
 ): Promise<void> {
   const supabase = createClient();
   const payload: Record<string, unknown> = {};
@@ -98,12 +103,23 @@ export async function updateBooking(
   if (updates.feedback !== undefined) payload.feedback = updates.feedback;
   if (updates.supervisor_notes !== undefined) payload.supervisor_notes = updates.supervisor_notes;
 
-  const { error } = await supabase
+  let query = supabase
     .from("bookings")
     .update(payload)
     .eq("id", bookingId);
 
+  if (options?.expectedStatuses?.length) {
+    query = query.in("status", options.expectedStatuses);
+  }
+
+  const { data, error } = await query
+    .select("id");
+
   if (error) throw error;
+
+  if (options?.expectedStatuses?.length && (data?.length ?? 0) === 0) {
+    throw new Error("Status booking sudah berubah. Muat ulang lalu coba lagi.");
+  }
 }
 
 export async function checkAvailability(
@@ -111,11 +127,12 @@ export async function checkAvailability(
   session: string,
 ): Promise<boolean> {
   const supabase = createClient();
+  const normalizedSession = normalizeBookingSession(session);
   const { count, error } = await supabase
     .from("bookings")
     .select("id", { count: "exact", head: true })
     .eq("date_iso", date)
-    .eq("session", session)
+    .eq("session", normalizedSession)
     .not("status", "in", '("Dibatalkan","Ditolak")');
 
   if (error) throw error;

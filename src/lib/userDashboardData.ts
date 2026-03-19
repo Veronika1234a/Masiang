@@ -23,9 +23,20 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   "Konsultasi",
 ];
 
+export const BOOKING_SESSION_OPTIONS = [
+  "08.00 - 11.00 WITA",
+  "08.30 - 11.30 WITA",
+  "09.00 - 12.00 WITA",
+  "10.00 - 13.00 WITA",
+  "13.00 - 16.00 WITA",
+] as const;
+
+export type BookingSessionOption = (typeof BOOKING_SESSION_OPTIONS)[number];
+
 export type NotificationType =
   | "booking_created"
   | "booking_approved"
+  | "booking_started"
   | "booking_rejected"
   | "booking_cancelled"
   | "booking_completed"
@@ -111,6 +122,7 @@ export interface SchoolDocument {
 export interface SchoolProfile {
   schoolName: string;
   npsn: string;
+  contactName: string;
   educationLevel: string;
   address: string;
   officialEmail: string;
@@ -118,6 +130,7 @@ export interface SchoolProfile {
   principalName: string;
   operatorName: string;
   district: string;
+  avatarPath?: string;
 }
 
 export interface Notification {
@@ -252,6 +265,29 @@ export function getTodayISO(): string {
 
 export function getTomorrowISO(): string {
   return withDayOffset(1);
+}
+
+export function normalizeBookingSession(session: string): string {
+  const trimmed = session.trim();
+  if (trimmed.length === 0) {
+    return "";
+  }
+
+  if ((BOOKING_SESSION_OPTIONS as readonly string[]).includes(trimmed)) {
+    return trimmed;
+  }
+
+  const digits = trimmed.replace(/[^\d]/g, "");
+  if (digits.length < 8) {
+    return trimmed;
+  }
+
+  const canonical = `${digits.slice(0, 2)}.${digits.slice(2, 4)} - ${digits.slice(4, 6)}.${digits.slice(6, 8)} WITA`;
+  if ((BOOKING_SESSION_OPTIONS as readonly string[]).includes(canonical)) {
+    return canonical;
+  }
+
+  return canonical;
 }
 
 let bookingCounter = 6;
@@ -520,6 +556,7 @@ export function getSchoolProfile(): SchoolProfile {
   return {
     schoolName: "UPT SDN 1 Mappak",
     npsn: "10265538",
+    contactName: "Andi Saputra",
     educationLevel: "Sekolah Dasar",
     address: "Jl. Raya Mappak No. 123, Tana Toraja",
     officialEmail: "sdn1mappak@gmail.com",

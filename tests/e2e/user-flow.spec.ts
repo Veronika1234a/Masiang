@@ -1,10 +1,14 @@
 import { expect } from "@playwright/test";
 import { test } from "./support/fixtures";
 
-async function login(page: Parameters<typeof test>[0]["page"], email: string) {
+async function login(
+  page: Parameters<typeof test>[0]["page"],
+  email: string,
+  password = "password123",
+) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Kata Sandi").fill("password123");
+  await page.getByLabel("Kata Sandi").fill(password);
   await page.getByRole("button", { name: "Masuk" }).click();
 }
 
@@ -25,7 +29,7 @@ test("school and admin can complete the main lifecycle end-to-end", async ({ pag
   await page.getByLabel("Topik Pendampingan").fill("Supervisi Akademik Semester Genap");
   await page.getByLabel("Kategori Layanan").selectOption("Supervisi");
   await page.getByLabel("Tanggal").fill("2026-03-20");
-  await page.getByLabel("Sesi").fill("09.00 - 12.00 WITA");
+  await page.getByLabel("Sesi").selectOption("09.00 - 12.00 WITA");
   await page.getByLabel("Tujuan Pendampingan").fill("Mendapatkan umpan balik untuk pembelajaran semester genap.");
   await page.getByLabel("Catatan Tambahan").fill("Mohon fokus pada observasi kelas dan tindak lanjut refleksi.");
   await page.getByRole("button", { name: "Kirim Booking" }).click();
@@ -33,7 +37,7 @@ test("school and admin can complete the main lifecycle end-to-end", async ({ pag
 
   await expect(page.getByText("Booking Berhasil Diajukan")).toBeVisible();
   const successText = await page.locator("section").filter({ hasText: "Booking Berhasil Diajukan" }).textContent();
-  const bookingId = successText?.match(/Booking\s+(BK-\d+)/)?.[1];
+  const bookingId = successText?.match(/Booking\s+(BK-[A-Z0-9]+)/)?.[1];
   expect(bookingId).toBeTruthy();
 
   await page.getByRole("link", { name: "Lihat Daftar Booking" }).click();
@@ -240,6 +244,132 @@ test("school can update profile and admin can inspect schools and documents", as
   await expect(page).toHaveURL(/\/dashboard-admin\/detail-dokumen\?documentId=DOC-201$/);
   await expect(page.getByRole("heading", { name: "Laporan Literasi.pdf" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Unduh" })).toBeVisible();
+});
+
+test("school can change password, upload avatar, print reports, and download documents through storage flows", async ({ page, backend }) => {
+  backend.reset();
+
+  backend.state.bookings.unshift({
+    id: "BK-301",
+    school_id: "school-1",
+    school_name: "SDN 1 Makale",
+    topic: "Pendampingan Literasi",
+    category: "Pendampingan",
+    date_iso: "2026-03-18",
+    session: "08.00 - 11.00 WITA",
+    status: "Selesai",
+    timeline: [
+      { title: "Pengajuan diterima", note: "Booking masuk", time: "08.00 WITA", status: "done" },
+      { title: "Verifikasi admin", note: "Admin menyetujui jadwal", time: "08.30 WITA", status: "done" },
+      { title: "Sesi pendampingan", note: "Sesi selesai dilaksanakan", time: "09.00 WITA", status: "done" },
+      { title: "Unggah laporan", note: "Dokumen sudah lengkap", time: "10.00 WITA", status: "done" },
+    ],
+    goal: "Penguatan literasi sekolah",
+    notes: "Fokus pada praktik membaca pagi.",
+    cancel_reason: null,
+    rating: null,
+    feedback: null,
+    supervisor_notes: "Pertahankan dokumentasi praktik baik.",
+    created_at: "2026-03-18T08:00:00.000Z",
+  });
+  backend.state.histories.unshift({
+    id: "RH-301",
+    school_id: "school-1",
+    booking_id: "BK-301",
+    date_iso: "2026-03-18",
+    school_name: "SDN 1 Makale",
+    session: "08.00 - 11.00 WITA",
+    title: "Pendampingan Literasi",
+    description: "Sesi pendampingan literasi selesai dilaksanakan.",
+    status: "Tindak Lanjut",
+    follow_up_iso: "2026-03-25",
+    supervisor_notes: "Pertahankan dokumentasi praktik baik.",
+    follow_up_done: false,
+    follow_up_items: [
+      { id: "FU-301", text: "Upload laporan hasil sesi", done: false },
+    ],
+    created_at: "2026-03-18T11:00:00.000Z",
+  });
+  backend.state.documents.unshift({
+    id: "DOC-301",
+    school_id: "school-1",
+    booking_id: "BK-301",
+    history_id: "RH-301",
+    file_name: "Laporan Literasi.pdf",
+    storage_path: "school-1/laporan-literasi.pdf",
+    file_size: 10240,
+    mime_type: "application/pdf",
+    stage: "Laporan",
+    review_status: "Disetujui",
+    reviewer_notes: null,
+    version: 1,
+    parent_doc_id: null,
+    uploaded_at: "18 Mar 2026",
+    created_at: "2026-03-18T12:00:00.000Z",
+  });
+  backend.state.documents.unshift({
+    id: "DOC-004",
+    school_id: "school-1",
+    booking_id: null,
+    history_id: "RH-301",
+    file_name: "Berita Acara Pendampingan.pdf",
+    storage_path: "__seed__/DOC-004",
+    file_size: 980000,
+    mime_type: "application/pdf",
+    stage: "Pelaksanaan",
+    review_status: "Menunggu Review",
+    reviewer_notes: null,
+    version: 1,
+    parent_doc_id: null,
+    uploaded_at: "18 Mar 2026",
+    created_at: "2026-03-18T12:05:00.000Z",
+  });
+  backend.state.storagePaths.push("school-1/laporan-literasi.pdf");
+
+  await login(page, "school@example.com");
+  await page.goto("/dashboard/profil");
+  await page.getByRole("button", { name: "Ganti Password" }).click();
+  await page.getByLabel("Password Saat Ini").fill("password123");
+  await page.getByLabel("Password Baru", { exact: true }).fill("password456");
+  await page.getByLabel("Konfirmasi Password Baru", { exact: true }).fill("password456");
+  await page.getByRole("button", { name: "Simpan Password" }).click();
+  await expect(
+    page.locator("section").filter({ hasText: "Ganti Password" }).getByText("Password berhasil diubah."),
+  ).toBeVisible();
+
+  await page.locator('input[type="file"][accept="image/*"]').setInputFiles({
+    name: "avatar.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("mock avatar"),
+  });
+  await expect(page.getByAltText("Foto profil SDN 1 Makale")).toBeVisible();
+
+  await logout(page);
+  await login(page, "school@example.com", "password456");
+  await expect(page).toHaveURL(/\/dashboard\/ringkasan$/);
+
+  await page.goto("/dashboard/riwayat/RH-301");
+  const schoolDownloadPopupPromise = page.waitForEvent("popup");
+  await page.locator("article", { hasText: "Laporan Literasi.pdf" }).getByRole("button", { name: "Unduh" }).click();
+  const schoolDownloadPopup = await schoolDownloadPopupPromise;
+  await schoolDownloadPopup.waitForLoadState("domcontentloaded");
+  await expect(schoolDownloadPopup).toHaveURL(/\/storage\/v1\/object\/sign\/school-documents\/school-1\/laporan-literasi\.pdf/);
+
+  await page.goto("/dashboard/booking/BK-301");
+  const printPopupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Cetak" }).click();
+  const printPopup = await printPopupPromise;
+  expect(printPopup).toBeTruthy();
+  await expect(page.getByText("Popup cetak diblokir browser. Izinkan popup lalu coba lagi.")).toHaveCount(0);
+
+  await logout(page);
+  await login(page, "admin@example.com");
+  await page.goto("/dashboard-admin/detail-dokumen?documentId=DOC-301");
+  const adminDownloadPopupPromise = page.waitForEvent("popup");
+  await page.locator("article", { hasText: "Berita Acara Pendampingan.pdf" }).getByRole("button", { name: "Unduh" }).click();
+  const adminDownloadPopup = await adminDownloadPopupPromise;
+  expect(adminDownloadPopup).toBeTruthy();
+  await expect(page.getByText('Dokumen "Berita Acara Pendampingan.pdf" belum memiliki file yang bisa diunduh.')).toHaveCount(0);
 });
 
 test("school can register and log in with redirect target preserved", async ({ page, backend }) => {

@@ -16,6 +16,7 @@ interface MockAccount {
   principal_name: string | null;
   operator_name: string | null;
   district: string | null;
+  avatar_path: string | null;
   created_at: string;
 }
 
@@ -98,6 +99,20 @@ interface MockState {
   };
 }
 
+interface DelayRule {
+  method?: string;
+  pathIncludes: string;
+  delayMs: number;
+}
+
+interface FailureRule {
+  method?: string;
+  pathIncludes: string;
+  status: number;
+  body: unknown;
+  once: boolean;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -113,6 +128,7 @@ function createAccount(overrides: Partial<MockAccount> & Pick<MockAccount, "id" 
     principal_name: "Ibu Kepala Sekolah",
     operator_name: "Operator Sekolah",
     district: "Tana Toraja",
+    avatar_path: null,
     created_at: nowIso(),
     ...overrides,
   };
@@ -188,6 +204,30 @@ function parseNotIn(value: string | null): string[] | null {
     .filter(Boolean);
 }
 
+function parseIn(value: string | null): string[] | null {
+  if (!value || !value.startsWith("in.")) return null;
+  const match = value.match(/in\.\((.*)\)/);
+  if (!match) return null;
+  return match[1]
+    .split(",")
+    .map((item) => item.replace(/^"+|"+$/g, "").replace(/^'+|'+$/g, "").trim())
+    .filter(Boolean);
+}
+
+function normalizeBookingSession(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const digits = trimmed.replace(/[^\d]/g, "");
+  if (digits.length < 8) {
+    return trimmed;
+  }
+
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)} - ${digits.slice(4, 6)}.${digits.slice(6, 8)} WITA`;
+}
+
 function toAuthUser(account: MockAccount) {
   return {
     id: account.id,
@@ -209,6 +249,7 @@ function toAuthUser(account: MockAccount) {
       npsn: account.npsn,
       phone: account.phone,
       address: account.address,
+      avatar_path: account.avatar_path,
     },
     identities: [],
     created_at: account.created_at,
@@ -230,6 +271,7 @@ function toProfileRow(account: MockAccount) {
     principal_name: account.principal_name,
     operator_name: account.operator_name,
     district: account.district,
+    avatar_path: account.avatar_path,
     created_at: account.created_at,
   };
 }
@@ -260,6 +302,8 @@ function json(route: Route, status: number, data: unknown, headers?: Record<stri
 export class MockSupabaseBackend {
   private sessions = new Map<string, string>();
   private routeInstalled = false;
+  private delayRules: DelayRule[] = [];
+  private failureRules: FailureRule[] = [];
   state: MockState;
 
   constructor(seed: MockState = createBaseMockState()) {
@@ -269,12 +313,38 @@ export class MockSupabaseBackend {
   reset(seed: MockState = createBaseMockState()) {
     this.state = deepClone(seed);
     this.sessions.clear();
+    this.delayRules = [];
+    this.failureRules = [];
+  }
+
+  addDelayRule(rule: DelayRule) {
+    this.delayRules.push(rule);
+  }
+
+  failNextRequest(rule: Omit<FailureRule, "once">) {
+    this.failureRules.push({ ...rule, once: true });
+  }
+
+  failRequest(rule: FailureRule) {
+    this.failureRules.push(rule);
+  }
+
+  clearNetworkRules() {
+    this.delayRules = [];
+    this.failureRules = [];
+  }
+
+  expireAllSessions() {
+    this.sessions.clear();
   }
 
   async install(context: BrowserContext) {
     if (!this.routeInstalled) {
       await context.route(/\/(auth|rest|storage)\/v1\//, async (route) => {
         const url = new URL(route.request().url());
+        if (await this.applyNetworkRules(route, url)) {
+          return;
+        }
 
         if (url.pathname.includes("/auth/v1/")) {
           await this.handleAuth(route, url);
@@ -302,6 +372,40 @@ export class MockSupabaseBackend {
         path: "/",
       },
     ]);
+  }
+
+  private matchesRule(method: string, path: string, rule: { method?: string; pathIncludes: string }) {
+    if (rule.method && rule.method.toUpperCase() !== method.toUpperCase()) {
+      return false;
+    }
+
+    return path.includes(rule.pathIncludes);
+  }
+
+  private async applyNetworkRules(route: Route, url: URL): Promise<boolean> {
+    const method = route.request().method();
+    const path = url.pathname;
+
+    for (const rule of this.delayRules) {
+      if (this.matchesRule(method, path, rule)) {
+        await new Promise((resolve) => setTimeout(resolve, rule.delayMs));
+      }
+    }
+
+    const failureIndex = this.failureRules.findIndex((rule) =>
+      this.matchesRule(method, path, rule),
+    );
+    if (failureIndex === -1) {
+      return false;
+    }
+
+    const failureRule = this.failureRules[failureIndex];
+    if (failureRule.once) {
+      this.failureRules.splice(failureIndex, 1);
+    }
+
+    await json(route, failureRule.status, failureRule.body);
+    return true;
   }
 
   private nextNotifId() {
@@ -428,6 +532,44 @@ export class MockSupabaseBackend {
       return;
     }
 
+    if ((method === "PUT" || method === "PATCH") && url.pathname.endsWith("/user")) {
+      const account = this.findAccountByToken(route.request().headers()["authorization"]);
+      if (!account) {
+        await json(route, 401, { error: "invalid_token", error_description: "Invalid token" });
+        return;
+      }
+
+      const body = parseBody(route.request().postData() ?? null) as {
+        password?: string;
+        data?: Record<string, unknown>;
+      } | null;
+
+      if (body?.password !== undefined) {
+        account.password = String(body.password);
+      }
+
+      if (body?.data) {
+        if ("avatar_path" in body.data) {
+          account.avatar_path = body.data.avatar_path
+            ? String(body.data.avatar_path)
+            : null;
+        }
+        if ("school_name" in body.data) {
+          account.school_name = body.data.school_name
+            ? String(body.data.school_name)
+            : null;
+        }
+        if ("contact_name" in body.data) {
+          account.contact_name = body.data.contact_name
+            ? String(body.data.contact_name)
+            : null;
+        }
+      }
+
+      await json(route, 200, { user: toAuthUser(account) });
+      return;
+    }
+
     if (method === "POST" && url.pathname.endsWith("/logout")) {
       const authorization = route.request().headers()["authorization"];
       if (authorization?.startsWith("Bearer ")) {
@@ -464,6 +606,12 @@ export class MockSupabaseBackend {
       const notInValues = parseNotIn(value);
       if (notInValues) {
         filtered = filtered.filter((row) => !notInValues.includes(String((row as Record<string, unknown>)[key] ?? "")));
+        continue;
+      }
+
+      const inValues = parseIn(value);
+      if (inValues) {
+        filtered = filtered.filter((row) => inValues.includes(String((row as Record<string, unknown>)[key] ?? "")));
       }
     }
 
@@ -527,6 +675,9 @@ export class MockSupabaseBackend {
       if ("principal_name" in updates) account.principal_name = String(updates.principal_name ?? "");
       if ("operator_name" in updates) account.operator_name = String(updates.operator_name ?? "");
       if ("district" in updates) account.district = String(updates.district ?? "");
+      if ("avatar_path" in updates) {
+        account.avatar_path = updates.avatar_path ? String(updates.avatar_path) : null;
+      }
 
       await json(route, 200, []);
       return;
@@ -561,10 +712,12 @@ export class MockSupabaseBackend {
         return;
       }
 
+      const normalizedIncomingSession = normalizeBookingSession(String(body.session ?? ""));
+
       const conflicting = this.state.bookings.find(
         (booking) =>
           booking.date_iso === body.date_iso &&
-          booking.session === body.session &&
+          normalizeBookingSession(booking.session) === normalizedIncomingSession &&
           booking.status !== "Dibatalkan" &&
           booking.status !== "Ditolak",
       );
@@ -583,7 +736,7 @@ export class MockSupabaseBackend {
         topic: String(body.topic),
         category: body.category ? String(body.category) : null,
         date_iso: String(body.date_iso),
-        session: String(body.session),
+        session: normalizedIncomingSession,
         status: String(body.status),
         timeline: Array.isArray(body.timeline) ? (body.timeline as Array<Record<string, unknown>>) : [],
         goal: body.goal ? String(body.goal) : null,
@@ -613,6 +766,9 @@ export class MockSupabaseBackend {
       rows.forEach((row) => {
         const previousStatus = row.status;
         Object.assign(row, updates ?? {});
+        if (updates?.session !== undefined) {
+          row.session = normalizeBookingSession(String(updates.session ?? ""));
+        }
         if (updates?.cancel_reason !== undefined) {
           row.cancel_reason = updates.cancel_reason ? String(updates.cancel_reason) : null;
         }
@@ -639,6 +795,29 @@ export class MockSupabaseBackend {
           );
         }
       });
+
+      const select = url.searchParams.get("select");
+      if (select) {
+        const fields = select
+          .split(",")
+          .map((field) => field.trim())
+          .filter(Boolean);
+
+        const selectedRows = rows.map((row) => {
+          if (fields.length === 0 || fields[0] === "*") {
+            return row;
+          }
+
+          const picked: Record<string, unknown> = {};
+          fields.forEach((field) => {
+            picked[field] = (row as unknown as Record<string, unknown>)[field];
+          });
+          return picked;
+        });
+
+        await json(route, 200, selectedRows);
+        return;
+      }
 
       await json(route, 200, []);
       return;

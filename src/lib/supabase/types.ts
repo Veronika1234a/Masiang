@@ -23,6 +23,7 @@ export interface Database {
           principal_name: string | null;
           operator_name: string | null;
           district: string | null;
+          avatar_path: string | null;
           created_at: string;
         };
         Insert: {
@@ -38,6 +39,7 @@ export interface Database {
           principal_name?: string | null;
           operator_name?: string | null;
           district?: string | null;
+          avatar_path?: string | null;
           created_at?: string;
         };
         Update: {
@@ -53,6 +55,7 @@ export interface Database {
           principal_name?: string | null;
           operator_name?: string | null;
           district?: string | null;
+          avatar_path?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -66,6 +69,7 @@ export interface Database {
           category: string | null;
           date_iso: string;
           session: string;
+          session_key: string;
           status: string;
           timeline: Json;
           goal: string | null;
@@ -84,6 +88,7 @@ export interface Database {
           category?: string | null;
           date_iso: string;
           session: string;
+          session_key?: string;
           status?: string;
           timeline?: Json;
           goal?: string | null;
@@ -102,6 +107,7 @@ export interface Database {
           category?: string | null;
           date_iso?: string;
           session?: string;
+          session_key?: string;
           status?: string;
           timeline?: Json;
           goal?: string | null;
@@ -130,6 +136,7 @@ export interface Database {
           version: number | null;
           parent_doc_id: string | null;
           uploaded_at: string;
+          uploaded_at_ts: string;
           created_at: string;
         };
         Insert: {
@@ -147,6 +154,7 @@ export interface Database {
           version?: number | null;
           parent_doc_id?: string | null;
           uploaded_at: string;
+          uploaded_at_ts?: string;
           created_at?: string;
         };
         Update: {
@@ -164,6 +172,7 @@ export interface Database {
           version?: number | null;
           parent_doc_id?: string | null;
           uploaded_at?: string;
+          uploaded_at_ts?: string;
           created_at?: string;
         };
         Relationships: [];

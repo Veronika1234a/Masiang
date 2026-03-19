@@ -53,6 +53,38 @@ npm run test
 npm run test:e2e
 ```
 
+## Real Supabase Validation (Staging)
+
+Gunakan suite ini untuk verifikasi langsung ke Supabase nyata (bukan mock):
+
+```bash
+REAL_SUPABASE_TEST_MODE=1 npm run test:real-supabase
+```
+
+PowerShell:
+
+```powershell
+$env:REAL_SUPABASE_TEST_MODE="1"; npm run test:real-supabase
+```
+
+Environment variable yang wajib tersedia:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_TEST_SCHOOL_EMAIL`
+- `SUPABASE_TEST_SCHOOL_PASSWORD`
+- `SUPABASE_TEST_ADMIN_EMAIL`
+- `SUPABASE_TEST_ADMIN_PASSWORD`
+
+Suite ini memvalidasi:
+
+- RLS sekolah vs admin pada tabel `bookings`.
+- Trigger notifikasi `booking_created`, `booking_cancelled`, dan `doc_uploaded`.
+- Signed URL storage (`school-documents`) untuk owner, admin, dan cross-school deny.
+- Konflik race booking slot aktif (satu insert sukses, satu gagal unique constraint).
+- Session longevity: refresh token + invalidasi session multi-tab setelah global logout.
+
 ## Remaining Risk
 
 - E2E saat ini memakai mock backend, jadi staging dengan Supabase nyata tetap wajib diuji.

@@ -53,9 +53,11 @@ export default function DashboardDokumenPage() {
   const reviseRef = useRef<HTMLInputElement | null>(null);
   const [keyword, setKeyword] = useState("");
   const [activeStage, setActiveStage] = useState<DocumentStage | "Semua">("Semua");
+  const [uploadStage, setUploadStage] = useState<DocumentStage>("Melayani");
   const [deleteTarget, setDeleteTarget] = useState<SchoolDocument | null>(null);
   const [reviseTarget, setReviseTarget] = useState<SchoolDocument | null>(null);
   const [showChecklist, setShowChecklist] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const filteredDocuments = useMemo(() => {
     const nk = keyword.trim().toLowerCase();
@@ -67,22 +69,29 @@ export default function DashboardDokumenPage() {
   }, [activeStage, documents, keyword]);
 
   const validateAndUpload = async (files: File[]) => {
-    if (activeStage === "Semua") {
-      addToast("Pilih tahap dokumen terlebih dahulu sebelum upload.", "info");
+    if (files.length === 0) {
       return;
     }
 
-    const stage = activeStage;
-    for (const file of files) {
-      if (!isAllowedFile(file)) {
-        addToast(`Format "${file.name}" tidak didukung. Gunakan PDF, DOCX, XLSX, atau ZIP.`, "error");
-        continue;
+    setIsUploading(true);
+    try {
+      for (const file of files) {
+        if (!isAllowedFile(file)) {
+          addToast(`Format "${file.name}" tidak didukung. Gunakan PDF, DOCX, XLSX, atau ZIP.`, "error");
+          continue;
+        }
+        if (file.size > MAX_SIZE) {
+          addToast(`"${file.name}" melebihi batas 10MB.`, "error");
+          continue;
+        }
+        try {
+          await uploadDocument(file.name, uploadStage, file.size, file.type, undefined, file);
+        } catch {
+          // Error toast is handled in context.
+        }
       }
-      if (file.size > MAX_SIZE) {
-        addToast(`"${file.name}" melebihi batas 10MB.`, "error");
-        continue;
-      }
-      await uploadDocument(file.name, stage, file.size, file.type, undefined, file);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -154,20 +163,47 @@ export default function DashboardDokumenPage() {
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
               {stageTabs.map((tab) => (
-                <button key={tab} type="button" onClick={() => setActiveStage(tab)} className={`rounded-xl border px-4 py-2.5 text-[12px] font-bold uppercase tracking-[0.08em] transition-colors ${activeStage === tab ? "border-[#d5bb82] bg-[#fff2de] text-[#ad7a2c]" : "border-[#d8deeb] bg-white text-[#4f5b77] hover:bg-[#eef1f8]"}`}>{tab}</button>
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => {
+                    setActiveStage(tab);
+                    if (tab !== "Semua") {
+                      setUploadStage(tab);
+                    }
+                  }}
+                  className={`rounded-xl border px-4 py-2.5 text-[12px] font-bold uppercase tracking-[0.08em] transition-colors ${activeStage === tab ? "border-[#d5bb82] bg-[#fff2de] text-[#ad7a2c]" : "border-[#d8deeb] bg-white text-[#4f5b77] hover:bg-[#eef1f8]"}`}
+                >
+                  {tab}
+                </button>
               ))}
             </div>
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-              <label className="grid gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Cari Dokumen</span>
-                <input type="text" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Cari nama dokumen atau ID" className="min-h-11 rounded-xl border border-[#d8deeb] bg-white px-3 text-[14px] text-[#313f61] outline-none focus:border-[#b9c7de]" />
-              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Cari Dokumen</span>
+                  <input type="text" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Cari nama dokumen atau ID" className="min-h-11 rounded-xl border border-[#d8deeb] bg-white px-3 text-[14px] text-[#313f61] outline-none focus:border-[#b9c7de]" />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Tahap Upload</span>
+                  <select value={uploadStage} onChange={(e) => setUploadStage(e.target.value as DocumentStage)} className="min-h-11 rounded-xl border border-[#d8deeb] bg-white px-3 text-[14px] text-[#313f61] outline-none focus:border-[#b9c7de]">
+                    {ALL_STAGES.map((stage) => (
+                      <option key={stage} value={stage}>{stage}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <div className="flex flex-wrap gap-2">
                 <input ref={inputRef} type="file" multiple accept=".pdf,.docx,.xlsx,.zip" onChange={onUpload} className="hidden" />
-                <button type="button" onClick={() => inputRef.current?.click()} className="rounded-xl border border-[#c79a3c] bg-[#d2ac50] px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white hover:-translate-y-0.5 hover:bg-[#b8933d] hover:shadow-md transition-all">Upload Dokumen</button>
+                <button type="button" onClick={() => inputRef.current?.click()} disabled={isUploading} className="rounded-xl border border-[#c79a3c] bg-[#d2ac50] px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white hover:-translate-y-0.5 hover:bg-[#b8933d] hover:shadow-md transition-all disabled:cursor-not-allowed disabled:opacity-60">
+                  {isUploading ? "Mengunggah..." : "Upload Dokumen"}
+                </button>
                 <button type="button" onClick={() => setShowChecklist(true)} className="rounded-xl border border-[#cfd5e6] bg-white px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[#4f5b77] hover:bg-[#eef1f8]">Checklist</button>
               </div>
             </div>
+            <p className="text-[12px] text-[#6d7998]">
+              Upload baru akan masuk ke tahap <span className="font-bold text-[#25365f]">{uploadStage}</span>. Filter daftar di atas tidak memblok upload.
+            </p>
           </div>
         </section>
 
@@ -217,7 +253,9 @@ export default function DashboardDokumenPage() {
             )) : (
               <div className="px-6 py-10 text-center">
                 <p className="text-[14px] text-[#6d7998] mb-4">Tidak ada dokumen yang cocok dengan filter.</p>
-                <button type="button" onClick={() => inputRef.current?.click()} className="rounded-xl bg-[#d2ac50] px-6 py-3 text-[12px] font-bold uppercase text-white hover:bg-[#b8933d]">Upload Dokumen Pertama</button>
+                <button type="button" onClick={() => inputRef.current?.click()} disabled={isUploading} className="rounded-xl bg-[#d2ac50] px-6 py-3 text-[12px] font-bold uppercase text-white hover:bg-[#b8933d] disabled:cursor-not-allowed disabled:opacity-60">
+                  {isUploading ? "Mengunggah..." : "Upload Dokumen Pertama"}
+                </button>
               </div>
             )}
           </div>

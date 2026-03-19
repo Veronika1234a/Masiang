@@ -6,7 +6,12 @@ import { type ChangeEvent, type FormEvent, Suspense, useMemo, useRef, useState }
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useDashboard } from "@/lib/DashboardContext";
-import { getTomorrowISO, SERVICE_CATEGORIES } from "@/lib/userDashboardData";
+import {
+  BOOKING_SESSION_OPTIONS,
+  getTomorrowISO,
+  normalizeBookingSession,
+  SERVICE_CATEGORIES,
+} from "@/lib/userDashboardData";
 
 type BookingFormField = "topic" | "category" | "date" | "session" | "goal" | "notes";
 
@@ -27,7 +32,8 @@ function validate(values: BookingFormValues, minDate: string): BookingFormErrors
   if (!values.category) errors.category = "Kategori layanan wajib dipilih.";
   if (!values.date) errors.date = "Tanggal wajib diisi.";
   else if (values.date < minDate) errors.date = "Tanggal harus minimal besok (H+1).";
-  if (!values.session.trim()) errors.session = "Sesi waktu wajib diisi.";
+  if (!values.session.trim()) errors.session = "Sesi waktu wajib dipilih.";
+  else if (!(BOOKING_SESSION_OPTIONS as readonly string[]).includes(normalizeBookingSession(values.session))) errors.session = "Gunakan pilihan sesi yang tersedia.";
   if (!values.goal.trim() || values.goal.trim().length < 10) errors.goal = "Tujuan minimal 10 karakter.";
   if (!values.notes.trim() || values.notes.trim().length < 10) errors.notes = "Catatan minimal 10 karakter.";
   return errors;
@@ -82,7 +88,7 @@ function BookingBaruContent() {
 
     if (field === "date" || field === "session") {
       const d = field === "date" ? event.target.value : nextValues.date;
-      const s = field === "session" ? event.target.value : nextValues.session;
+      const s = field === "session" ? normalizeBookingSession(event.target.value) : nextValues.session;
       if (d && s) {
         const requestId = ++availabilityRequestIdRef.current;
         checkAvailability(d, s).then((available) => {
@@ -216,7 +222,12 @@ function BookingBaruContent() {
                 </label>
                 <label className="grid gap-2">
                   <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#6d7998]">Sesi</span>
-                  <input type="text" value={values.session} onChange={onChange("session")} onBlur={onBlur("session")} placeholder="Contoh: 09.00 - 12.00 WITA" aria-invalid={Boolean(touched.session && errors.session)} className="min-h-11 rounded-xl border border-[#d7deef] bg-white px-3 text-[14px] text-[#313f61] outline-none transition-colors focus:border-[#b7c4df]" />
+                  <select value={values.session} onChange={onChange("session")} onBlur={onBlur("session")} aria-invalid={Boolean(touched.session && errors.session)} className="min-h-11 rounded-xl border border-[#d7deef] bg-white px-3 text-[14px] text-[#313f61] outline-none transition-colors focus:border-[#b7c4df]">
+                    <option value="">Pilih sesi...</option>
+                    {BOOKING_SESSION_OPTIONS.map((sessionOption) => (
+                      <option key={sessionOption} value={sessionOption}>{sessionOption}</option>
+                    ))}
+                  </select>
                   {touched.session && errors.session && <small className="text-[12px] font-bold text-[#a13636]">{errors.session}</small>}
                 </label>
               </div>

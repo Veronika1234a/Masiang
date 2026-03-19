@@ -18,6 +18,7 @@ function rowToSchoolProfile(row: ProfileRow): SchoolProfile {
   return {
     schoolName: row.school_name ?? "",
     npsn: row.npsn ?? "",
+    contactName: row.contact_name ?? "",
     educationLevel: row.education_level ?? "",
     address: row.address ?? "",
     officialEmail: row.email,
@@ -25,6 +26,7 @@ function rowToSchoolProfile(row: ProfileRow): SchoolProfile {
     principalName: row.principal_name ?? "",
     operatorName: row.operator_name ?? "",
     district: row.district ?? "",
+    avatarPath: row.avatar_path ?? undefined,
   };
 }
 
@@ -63,6 +65,7 @@ export async function updateProfile(
   const payload: Record<string, unknown> = {};
   if (updates.schoolName !== undefined) payload.school_name = updates.schoolName;
   if (updates.npsn !== undefined) payload.npsn = updates.npsn;
+  if (updates.contactName !== undefined) payload.contact_name = updates.contactName;
   if (updates.educationLevel !== undefined) payload.education_level = updates.educationLevel;
   if (updates.address !== undefined) payload.address = updates.address;
   if (updates.officialEmail !== undefined) payload.email = updates.officialEmail;
@@ -70,6 +73,7 @@ export async function updateProfile(
   if (updates.principalName !== undefined) payload.principal_name = updates.principalName;
   if (updates.operatorName !== undefined) payload.operator_name = updates.operatorName;
   if (updates.district !== undefined) payload.district = updates.district;
+  if (updates.avatarPath !== undefined) payload.avatar_path = updates.avatarPath ?? null;
 
   const { error } = await supabase
     .from("profiles")
