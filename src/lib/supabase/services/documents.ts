@@ -97,10 +97,7 @@ export async function insertDocument(
     firstAttempt.error.code === "PGRST204" &&
     firstAttempt.error.message.includes("uploaded_at_ts")
   ) {
-    const legacyPayload = { ...payload } as typeof payload & {
-      uploaded_at_ts?: string;
-    };
-    delete legacyPayload.uploaded_at_ts;
+    const { uploaded_at_ts: _legacyUploadedAtTs, ...legacyPayload } = payload;
     const legacyAttempt = await supabase
       .from("documents")
       .insert(legacyPayload)
