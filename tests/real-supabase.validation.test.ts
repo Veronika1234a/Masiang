@@ -868,4 +868,490 @@ if (!realModeEnabled) {
       }
     },
   );
+
+  test(
+    "real Supabase hardening: extended session durability and cross-table RLS penetration checks",
+    { timeout: 220_000 },
+    async () => {
+      const {
+        supabaseUrl,
+        anonKey,
+        serviceRoleKey,
+        schoolEmail,
+        schoolPassword,
+        adminEmail,
+        adminPassword,
+      } = readRealSupabaseEnv();
+
+      const serviceClient = createServiceClient(supabaseUrl, serviceRoleKey);
+      const runTag = `HARD${Date.now().toString(36).toUpperCase()}`;
+      const baseOffset = 720 + (Date.now() % 45);
+      const bookingPrimaryDate = futureDateISO(baseOffset);
+      const bookingSecondaryDate = futureDateISO(baseOffset + 1);
+      const secondarySchoolEmail = `qa-hardening-${runTag.toLowerCase()}@example.test`;
+      const secondarySchoolPassword = `Qa!${randomUUID().slice(0, 12)}A1`;
+
+      const bookingIds: string[] = [];
+      const documentIds: string[] = [];
+      const historyIds: string[] = [];
+      const notificationIds: string[] = [];
+      const notificationReferenceIds: string[] = [];
+      const storagePaths: string[] = [];
+
+      let secondarySchoolId: string | null = null;
+      let school: SignedInClient | null = null;
+      let schoolSecondary: SignedInClient | null = null;
+      let admin: SignedInClient | null = null;
+      let reopenedClient: TypedClient | null = null;
+
+      try {
+        school = await signInWithPassword(supabaseUrl, anonKey, schoolEmail, schoolPassword);
+        admin = await signInWithPassword(supabaseUrl, anonKey, adminEmail, adminPassword);
+
+        const schoolProfile = await waitForProfile(serviceClient, school.userId);
+        const adminProfile = await waitForProfile(serviceClient, admin.userId);
+        assert.equal(schoolProfile.role, "school");
+        assert.equal(adminProfile.role, "admin");
+
+        const createSecondary = await serviceClient.auth.admin.createUser({
+          email: secondarySchoolEmail,
+          password: secondarySchoolPassword,
+          email_confirm: true,
+          user_metadata: {
+            role: "school",
+            school_name: `QA Hardening ${runTag}`,
+            npsn: `8${Date.now().toString().slice(-7)}`,
+            contact_name: "QA Hardening Bot",
+            phone: "081234560001",
+            address: "Jl. QA Hardening",
+          },
+        });
+        assert.ifError(createSecondary.error);
+        assert.ok(createSecondary.data.user);
+        secondarySchoolId = createSecondary.data.user.id;
+
+        const secondaryProfile = await waitForProfile(serviceClient, secondarySchoolId);
+        assert.equal(secondaryProfile.role, "school");
+
+        schoolSecondary = await signInWithPassword(
+          supabaseUrl,
+          anonKey,
+          secondarySchoolEmail,
+          secondarySchoolPassword,
+        );
+
+        // PROFILE RLS: school cannot read/update another school's profile.
+        const profileCrossRead = await school.client
+          .from("profiles")
+          .select("id, email")
+          .eq("id", secondarySchoolId)
+          .maybeSingle();
+        assert.ifError(profileCrossRead.error);
+        assert.equal(
+          profileCrossRead.data,
+          null,
+          "School can read another school's profile (RLS broken).",
+        );
+
+        const profileIllegalUpdate = await school.client
+          .from("profiles")
+          .update({ contact_name: `RLS blocked ${runTag}` })
+          .eq("id", secondarySchoolId)
+          .select("id");
+        assert.ifError(profileIllegalUpdate.error);
+        assert.equal(
+          profileIllegalUpdate.data?.length ?? 0,
+          0,
+          "School unexpectedly updated another school's profile.",
+        );
+
+        const adminProfileRead = await admin.client
+          .from("profiles")
+          .select("id")
+          .in("id", [school.userId, secondarySchoolId]);
+        assert.ifError(adminProfileRead.error);
+        assert.equal(
+          adminProfileRead.data?.length ?? 0,
+          2,
+          "Admin cannot read both school profiles.",
+        );
+
+        const primarySchoolName = schoolProfile.school_name ?? "School QA Hardening Primary";
+        const secondarySchoolName = secondaryProfile.school_name ?? "School QA Hardening Secondary";
+
+        const bookingPrimaryId = `BK-HARD-A-${runTag}`;
+        const bookingSecondaryId = `BK-HARD-B-${runTag}`;
+        bookingIds.push(bookingPrimaryId, bookingSecondaryId);
+        notificationReferenceIds.push(bookingPrimaryId, bookingSecondaryId);
+
+        const createPrimaryBooking = await school.client
+          .from("bookings")
+          .insert({
+            id: bookingPrimaryId,
+            school_id: school.userId,
+            school_name: primarySchoolName,
+            topic: `Hardening primary ${runTag}`,
+            category: "Pendampingan",
+            date_iso: bookingPrimaryDate,
+            session: "09.00 - 12.00 WITA",
+            status: "Menunggu",
+            timeline: [],
+            goal: "RLS penetration primary",
+            notes: "hardening primary",
+          })
+          .select("id")
+          .single();
+        assert.ifError(createPrimaryBooking.error);
+
+        const createSecondaryBooking = await schoolSecondary.client
+          .from("bookings")
+          .insert({
+            id: bookingSecondaryId,
+            school_id: schoolSecondary.userId,
+            school_name: secondarySchoolName,
+            topic: `Hardening secondary ${runTag}`,
+            category: "Supervisi",
+            date_iso: bookingSecondaryDate,
+            session: "08.00 - 10.00 WITA",
+            status: "Menunggu",
+            timeline: [],
+            goal: "RLS penetration secondary",
+            notes: "hardening secondary",
+          })
+          .select("id")
+          .single();
+        assert.ifError(createSecondaryBooking.error);
+
+        // DOCUMENT RLS
+        const primaryDocumentId = `DOC-HARD-A-${runTag}`;
+        const secondaryDocumentId = `DOC-HARD-B-${runTag}`;
+        documentIds.push(primaryDocumentId, secondaryDocumentId);
+        notificationReferenceIds.push(primaryDocumentId, secondaryDocumentId);
+
+        const createPrimaryDocument = await school.client
+          .from("documents")
+          .insert({
+            id: primaryDocumentId,
+            school_id: school.userId,
+            booking_id: bookingPrimaryId,
+            history_id: null,
+            file_name: `hard-primary-${runTag}.pdf`,
+            storage_path: null,
+            file_size: 1024,
+            mime_type: "application/pdf",
+            stage: "Melayani",
+            review_status: "Menunggu Review",
+            reviewer_notes: null,
+            version: 1,
+            parent_doc_id: null,
+            uploaded_at: "19 Maret 2026",
+          })
+          .select("id")
+          .single();
+        assert.ifError(createPrimaryDocument.error);
+
+        const createSecondaryDocument = await schoolSecondary.client
+          .from("documents")
+          .insert({
+            id: secondaryDocumentId,
+            school_id: schoolSecondary.userId,
+            booking_id: bookingSecondaryId,
+            history_id: null,
+            file_name: `hard-secondary-${runTag}.pdf`,
+            storage_path: null,
+            file_size: 1024,
+            mime_type: "application/pdf",
+            stage: "Melayani",
+            review_status: "Menunggu Review",
+            reviewer_notes: null,
+            version: 1,
+            parent_doc_id: null,
+            uploaded_at: "19 Maret 2026",
+          })
+          .select("id")
+          .single();
+        assert.ifError(createSecondaryDocument.error);
+
+        const schoolVisibleDocs = await school.client
+          .from("documents")
+          .select("id, school_id")
+          .in("id", [primaryDocumentId, secondaryDocumentId]);
+        assert.ifError(schoolVisibleDocs.error);
+        const schoolDocIds = new Set((schoolVisibleDocs.data ?? []).map((row) => row.id));
+        assert.ok(schoolDocIds.has(primaryDocumentId), "School cannot read own document.");
+        assert.ok(
+          !schoolDocIds.has(secondaryDocumentId),
+          "School can read another school's document (RLS broken).",
+        );
+
+        const illegalDocumentUpdate = await school.client
+          .from("documents")
+          .update({ review_status: "Disetujui" })
+          .eq("id", secondaryDocumentId)
+          .select("id");
+        assert.ifError(illegalDocumentUpdate.error);
+        assert.equal(
+          illegalDocumentUpdate.data?.length ?? 0,
+          0,
+          "School unexpectedly updated another school's document.",
+        );
+
+        // HISTORY RLS
+        const primaryHistoryId = `RH-HARD-A-${runTag}`;
+        const secondaryHistoryId = `RH-HARD-B-${runTag}`;
+        historyIds.push(primaryHistoryId, secondaryHistoryId);
+
+        const createPrimaryHistory = await school.client
+          .from("histories")
+          .insert({
+            id: primaryHistoryId,
+            school_id: school.userId,
+            booking_id: bookingPrimaryId,
+            date_iso: bookingPrimaryDate,
+            school_name: primarySchoolName,
+            session: "09.00 - 12.00 WITA",
+            title: `History primary ${runTag}`,
+            description: "Primary history record for RLS hardening test.",
+            status: "Selesai",
+            follow_up_iso: null,
+            supervisor_notes: null,
+            follow_up_done: false,
+            follow_up_items: [],
+          })
+          .select("id")
+          .single();
+        assert.ifError(createPrimaryHistory.error);
+
+        const createSecondaryHistory = await schoolSecondary.client
+          .from("histories")
+          .insert({
+            id: secondaryHistoryId,
+            school_id: schoolSecondary.userId,
+            booking_id: bookingSecondaryId,
+            date_iso: bookingSecondaryDate,
+            school_name: secondarySchoolName,
+            session: "08.00 - 10.00 WITA",
+            title: `History secondary ${runTag}`,
+            description: "Secondary history record for RLS hardening test.",
+            status: "Selesai",
+            follow_up_iso: null,
+            supervisor_notes: null,
+            follow_up_done: false,
+            follow_up_items: [],
+          })
+          .select("id")
+          .single();
+        assert.ifError(createSecondaryHistory.error);
+
+        const schoolVisibleHistories = await school.client
+          .from("histories")
+          .select("id, school_id")
+          .in("id", [primaryHistoryId, secondaryHistoryId]);
+        assert.ifError(schoolVisibleHistories.error);
+        const schoolHistoryIds = new Set(
+          (schoolVisibleHistories.data ?? []).map((row) => row.id),
+        );
+        assert.ok(schoolHistoryIds.has(primaryHistoryId), "School cannot read own history.");
+        assert.ok(
+          !schoolHistoryIds.has(secondaryHistoryId),
+          "School can read another school's history (RLS broken).",
+        );
+
+        const illegalHistoryUpdate = await school.client
+          .from("histories")
+          .update({ follow_up_done: true })
+          .eq("id", secondaryHistoryId)
+          .select("id");
+        assert.ifError(illegalHistoryUpdate.error);
+        assert.equal(
+          illegalHistoryUpdate.data?.length ?? 0,
+          0,
+          "School unexpectedly updated another school's history.",
+        );
+
+        // NOTIFICATION RLS
+        const ownNotifId = `NTF-HARD-OWN-${runTag}`;
+        const adminToSecondaryNotifId = `NTF-HARD-ADM-${runTag}`;
+        notificationIds.push(ownNotifId, adminToSecondaryNotifId);
+
+        const schoolOwnNotifInsert = await school.client
+          .from("notifications")
+          .insert({
+            id: ownNotifId,
+            user_id: school.userId,
+            title: "Own notification",
+            message: "Allowed self insert notification.",
+            type: "doc_uploaded",
+            reference_id: primaryDocumentId,
+            reference_type: "document",
+            is_read: false,
+          });
+        assert.ifError(schoolOwnNotifInsert.error);
+
+        const illegalSchoolNotifInsert = await school.client
+          .from("notifications")
+          .insert({
+            id: `NTF-HARD-X-${runTag}`,
+            user_id: schoolSecondary.userId,
+            title: "Illegal notification",
+            message: "This should be blocked.",
+            type: "doc_uploaded",
+            reference_id: secondaryDocumentId,
+            reference_type: "document",
+            is_read: false,
+          });
+        assert.ok(
+          illegalSchoolNotifInsert.error,
+          "School can insert notification for another school user (RLS broken).",
+        );
+
+        const adminNotifInsert = await admin.client
+          .from("notifications")
+          .insert({
+            id: adminToSecondaryNotifId,
+            user_id: schoolSecondary.userId,
+            title: "Admin direct notification",
+            message: "Allowed admin insert notification.",
+            type: "booking_approved",
+            reference_id: bookingSecondaryId,
+            reference_type: "booking",
+            is_read: false,
+          });
+        assert.ifError(adminNotifInsert.error);
+
+        const schoolCrossNotifRead = await school.client
+          .from("notifications")
+          .select("id")
+          .eq("user_id", schoolSecondary.userId)
+          .in("id", [ownNotifId, adminToSecondaryNotifId]);
+        assert.ifError(schoolCrossNotifRead.error);
+        assert.equal(
+          schoolCrossNotifRead.data?.length ?? 0,
+          0,
+          "School can read another user's notifications (RLS broken).",
+        );
+
+        // STORAGE RLS
+        const primaryStoragePath = `${school.userId}/${runTag}/hardening.txt`;
+        storagePaths.push(primaryStoragePath);
+
+        const storageUpload = await school.client.storage
+          .from("school-documents")
+          .upload(
+            primaryStoragePath,
+            new Blob([`hardening storage ${runTag}`], { type: "text/plain" }),
+            { upsert: true, contentType: "text/plain" },
+          );
+        assert.ifError(storageUpload.error);
+
+        const secondarySignedUrl = await schoolSecondary.client.storage
+          .from("school-documents")
+          .createSignedUrl(primaryStoragePath, 120);
+        assert.ok(
+          secondarySignedUrl.error,
+          "Secondary school can create signed URL for another school's file (RLS broken).",
+        );
+
+        const secondaryDownload = await schoolSecondary.client.storage
+          .from("school-documents")
+          .download(primaryStoragePath);
+        assert.ok(
+          secondaryDownload.error,
+          "Secondary school can download another school's file (RLS broken).",
+        );
+
+        const adminSignedUrl = await admin.client.storage
+          .from("school-documents")
+          .createSignedUrl(primaryStoragePath, 120);
+        assert.ifError(adminSignedUrl.error);
+        assert.ok(adminSignedUrl.data?.signedUrl);
+
+        // SESSION DURABILITY: repeated refresh + reopen client + post-idle check.
+        const sessionBeforeRefresh = await school.client.auth.getSession();
+        assert.ifError(sessionBeforeRefresh.error);
+        assert.ok(sessionBeforeRefresh.data.session);
+
+        let rollingSession = sessionBeforeRefresh.data.session!;
+        for (let idx = 0; idx < 3; idx += 1) {
+          await wait(1_100);
+          const refreshed = await school.client.auth.refreshSession();
+          assert.ifError(refreshed.error);
+          assert.ok(refreshed.data.session, "Refresh did not return a session.");
+          rollingSession = refreshed.data.session!;
+        }
+
+        reopenedClient = createAnonClient(supabaseUrl, anonKey);
+        const reopenSessionSet = await reopenedClient.auth.setSession({
+          access_token: rollingSession.access_token,
+          refresh_token: rollingSession.refresh_token,
+        });
+        assert.ifError(reopenSessionSet.error);
+
+        const reopenedUser = await reopenedClient.auth.getUser();
+        assert.ifError(reopenedUser.error);
+        assert.equal(
+          reopenedUser.data.user?.id,
+          school.userId,
+          "Reopened client did not restore the expected school session.",
+        );
+
+        await wait(1_200);
+
+        const reopenedRefresh = await reopenedClient.auth.refreshSession();
+        assert.ifError(reopenedRefresh.error);
+        assert.ok(
+          reopenedRefresh.data.session,
+          "Reopened client could not refresh session after idle wait.",
+        );
+
+        const globalLogout = await school.client.auth.signOut({ scope: "global" });
+        assert.ifError(globalLogout.error);
+        await wait(500);
+
+        const reopenedAfterLogout = await reopenedClient.auth.refreshSession();
+        assert.ok(
+          reopenedAfterLogout.error || !reopenedAfterLogout.data.session,
+          "Reopened session still valid after global logout.",
+        );
+      } finally {
+        await Promise.allSettled([
+          school?.client.auth.signOut({ scope: "local" }),
+          schoolSecondary?.client.auth.signOut({ scope: "local" }),
+          admin?.client.auth.signOut({ scope: "local" }),
+          reopenedClient?.auth.signOut({ scope: "local" }),
+        ]);
+
+        if (notificationIds.length > 0) {
+          await serviceClient.from("notifications").delete().in("id", notificationIds);
+        }
+
+        if (notificationReferenceIds.length > 0) {
+          await serviceClient
+            .from("notifications")
+            .delete()
+            .in("reference_id", Array.from(new Set(notificationReferenceIds)));
+        }
+
+        if (historyIds.length > 0) {
+          await serviceClient.from("histories").delete().in("id", historyIds);
+        }
+
+        if (documentIds.length > 0) {
+          await serviceClient.from("documents").delete().in("id", documentIds);
+        }
+
+        if (bookingIds.length > 0) {
+          await serviceClient.from("bookings").delete().in("id", bookingIds);
+        }
+
+        if (storagePaths.length > 0) {
+          await serviceClient.storage.from("school-documents").remove(storagePaths);
+        }
+
+        if (secondarySchoolId) {
+          await serviceClient.auth.admin.deleteUser(secondarySchoolId);
+        }
+      }
+    },
+  );
 }

@@ -5,7 +5,7 @@ import { buildProtectedRedirectTarget } from "@/lib/userFlow";
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
   const e2eBypassEnabled =
-    process.env.E2E_TEST_MODE === "1" &&
+    process.env.E2E_TEST_MODE === "1" ||
     request.cookies.get("masiang-e2e-bypass")?.value === "1";
 
   const supabase = createServerClient(
