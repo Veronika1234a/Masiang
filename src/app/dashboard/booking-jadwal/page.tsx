@@ -71,6 +71,7 @@ const ALL_FILTERS: Array<BookingStatus | "Semua"> = ["Semua", "Disetujui", "Dala
 export default function BookingJadwalPage() {
   const { bookings, histories } = useDashboard();
   const [viewMonth, setViewMonth] = useState(() => getInitialMonth(bookings));
+  const [hasAlignedInitialMonth, setHasAlignedInitialMonth] = useState(false);
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "Semua">("Semua");
   const [selectedEvent, setSelectedEvent] = useState<BookingItem | null>(bookings[0] ?? null);
   const [panelPosition, setPanelPosition] = useState({ top: 0, left: 0 });
@@ -128,6 +129,19 @@ export default function BookingJadwalPage() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  useEffect(() => {
+    if (hasAlignedInitialMonth || bookings.length === 0) {
+      return;
+    }
+
+    const alignTimer = window.setTimeout(() => {
+      setViewMonth(getInitialMonth(bookings));
+      setHasAlignedInitialMonth(true);
+    }, 0);
+
+    return () => window.clearTimeout(alignTimer);
+  }, [bookings, hasAlignedInitialMonth]);
 
   return (
     <main className="text-[#121d35] w-full pb-10">

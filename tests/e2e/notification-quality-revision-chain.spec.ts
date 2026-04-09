@@ -6,6 +6,11 @@ async function login(page: Parameters<typeof test>[0]["page"], email: string) {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Kata Sandi").fill("password123");
   await page.getByRole("button", { name: "Masuk" }).click();
+  await expect(page).toHaveURL(
+    email === "admin@example.com"
+      ? /\/dashboard-admin(?:\?.*)?$/
+      : /\/dashboard\/ringkasan(?:\?.*)?$/,
+  );
 }
 
 test("notification quality: no duplicate cards, sorted by time, unread badge updates, and deep-link works", async ({

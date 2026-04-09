@@ -1,6 +1,12 @@
 import { expect } from "@playwright/test";
 import { test } from "./support/fixtures";
 
+function futureDate(daysAhead: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysAhead);
+  return date.toISOString().slice(0, 10);
+}
+
 async function login(
   page: Parameters<typeof test>[0]["page"],
   email: string,
@@ -10,6 +16,11 @@ async function login(
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Kata Sandi").fill(password);
   await page.getByRole("button", { name: "Masuk" }).click();
+  await expect(page).toHaveURL(
+    email === "admin@example.com"
+      ? /\/dashboard-admin(?:\?.*)?$/
+      : /\/dashboard\/ringkasan(?:\?.*)?$/,
+  );
 }
 
 async function logout(page: Parameters<typeof test>[0]["page"]) {
@@ -20,15 +31,15 @@ async function logout(page: Parameters<typeof test>[0]["page"]) {
 
 test("school and admin can complete the main lifecycle end-to-end", async ({ page, backend }) => {
   backend.reset();
+  const bookingDate = futureDate(2);
 
   await login(page, "school@example.com");
-  await expect(page).toHaveURL(/\/dashboard\/ringkasan$/);
   await expect(page.getByText("Halo, SDN 1 Makale.")).toBeVisible();
 
   await page.goto("/dashboard/booking-baru");
   await page.getByLabel("Topik Pendampingan").fill("Supervisi Akademik Semester Genap");
   await page.getByLabel("Kategori Layanan").selectOption("Supervisi");
-  await page.getByLabel("Tanggal").fill("2026-03-20");
+  await page.getByLabel("Tanggal").fill(bookingDate);
   await page.getByLabel("Sesi").selectOption("09.00 - 12.00 WITA");
   await page.getByLabel("Tujuan Pendampingan").fill("Mendapatkan umpan balik untuk pembelajaran semester genap.");
   await page.getByLabel("Catatan Tambahan").fill("Mohon fokus pada observasi kelas dan tindak lanjut refleksi.");
@@ -58,7 +69,7 @@ test("school and admin can complete the main lifecycle end-to-end", async ({ pag
   await bookingRow.getByRole("button", { name: "Mulai Sesi" }).click();
   await expect(bookingRow).toContainText("Dalam Proses");
   await bookingRow.getByRole("button", { name: "Catatan" }).click();
-  await page.getByPlaceholder("Tulis catatan hasil observasi, rekomendasi, dll...").fill("Lanjutkan penguatan refleksi guru dan dokumentasikan hasil observasi.");
+  await page.getByPlaceholder("Tulis catatan hasil observasi, rekomendasi, atau langkah tindak lanjut...").fill("Lanjutkan penguatan refleksi guru dan dokumentasikan hasil observasi.");
   await page.getByRole("button", { name: "Simpan Catatan" }).click();
   await expect(page.getByText("Catatan pengawas berhasil disimpan.")).toBeVisible();
 

@@ -6,6 +6,11 @@ async function login(page: Parameters<typeof test>[0]["page"], email: string) {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Kata Sandi").fill("password123");
   await page.getByRole("button", { name: "Masuk" }).click();
+  await expect(page).toHaveURL(
+    email === "admin@example.com"
+      ? /\/dashboard-admin(?:\?.*)?$/
+      : /\/dashboard\/ringkasan(?:\?.*)?$/,
+  );
 }
 
 test("school booking page supports search, status/date filter, sort, pagination, and reset", async ({
@@ -141,14 +146,14 @@ test("school booking page supports search, status/date filter, sort, pagination,
   await expect(page.locator("article", { hasText: "BK-U604" })).toHaveCount(0);
 
   await page.locator("select").first().selectOption("Dalam Proses");
-  await expect(page.getByText("BK-U603")).toBeVisible();
+  await expect(page.locator("article", { hasText: "BK-U603" })).toBeVisible();
   await expect(page.getByText("BK-U602")).toHaveCount(0);
 
   await page.locator("input[type='date']").first().fill("2026-03-03");
-  await expect(page.getByText("BK-U603")).toBeVisible();
+  await expect(page.locator("article", { hasText: "BK-U603" })).toBeVisible();
 
   await page.locator("select").nth(1).selectOption("date-asc");
-  await expect(page.getByText("BK-U603")).toBeVisible();
+  await expect(page.locator("article", { hasText: "BK-U603" })).toBeVisible();
 
   await page.getByRole("button", { name: "Reset" }).click();
   await expect(page.getByText("Halaman 1 dari 2")).toBeVisible();
@@ -249,10 +254,10 @@ test("school can use booking calendar status filter and open detail from event p
   await page.goto("/dashboard/booking-jadwal");
 
   await page.getByRole("button", { name: "Disetujui" }).click();
-  await expect(page.getByRole("button", { name: "08.00 - 10.00 WITA" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "10.00 - 12.00 WITA" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /08\.00 - 10\.00 WITA/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /10\.00 - 12\.00 WITA/ })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "08.00 - 10.00 WITA" }).click();
+  await page.getByRole("button", { name: /08\.00 - 10\.00 WITA/ }).click();
   await expect(page.getByRole("link", { name: "Detail Penuh" })).toBeVisible();
   await page.getByRole("link", { name: "Detail Penuh" }).click();
 

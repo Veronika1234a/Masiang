@@ -6,6 +6,11 @@ async function login(page: Parameters<typeof test>[0]["page"], email: string) {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Kata Sandi").fill("password123");
   await page.getByRole("button", { name: "Masuk" }).click();
+  await expect(page).toHaveURL(
+    email === "admin@example.com"
+      ? /\/dashboard-admin(?:\?.*)?$/
+      : /\/dashboard\/ringkasan(?:\?.*)?$/,
+  );
 }
 
 async function logout(page: Parameters<typeof test>[0]["page"]) {
