@@ -1,21 +1,28 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/lib/AuthContext";
 import { useDashboard } from "@/lib/DashboardContext";
 import { getSchoolDocumentsForAdmin } from "@/lib/userFlow";
-import { Modal } from "@/components/ui/Modal";
 import { formatShortDateID } from "@/lib/userDashboardData";
 
 function getStatusClasses(status: string) {
   switch (status) {
-    case "Menunggu": return "bg-[#fef3c7] text-[#92400e]";
-    case "Disetujui": return "bg-[#d1fae5] text-[#065f46]";
-    case "Dalam Proses": return "bg-[#dbeafe] text-[#1e40af]";
-    case "Selesai": return "bg-[#e8e0f0] text-[#5b21b6]";
-    case "Ditolak": return "bg-[#fee2e2] text-[#991b1b]";
-    case "Dibatalkan": return "bg-[#f3f4f6] text-[#6b7280]";
-    default: return "bg-[#f3f4f6] text-[#6b7280]";
+    case "Menunggu":
+      return "bg-[#fff6e6] text-[#9b6a1d]";
+    case "Disetujui":
+      return "bg-[#e8f3ee] text-[#2b5f52]";
+    case "Dalam Proses":
+      return "bg-[#eef4fb] text-[#35557c]";
+    case "Selesai":
+      return "bg-[#edf3ef] text-[#2f5a4b]";
+    case "Ditolak":
+      return "bg-[#fdf0ef] text-[#9b4b45]";
+    case "Dibatalkan":
+      return "bg-[#f0eef2] text-[#6d7998]";
+    default:
+      return "bg-[#f0eef2] text-[#6d7998]";
   }
 }
 
@@ -75,9 +82,9 @@ export default function AdminSekolahPage() {
         email: registered?.email,
         npsn: registered?.npsn,
         totalBookings: schoolBookings.length,
-        pendingBookings: schoolBookings.filter((b) => b.status === "Menunggu").length,
-        activeBookings: schoolBookings.filter((b) => b.status === "Disetujui" || b.status === "Dalam Proses").length,
-        completedBookings: schoolBookings.filter((b) => b.status === "Selesai").length,
+        pendingBookings: schoolBookings.filter((booking) => booking.status === "Menunggu").length,
+        activeBookings: schoolBookings.filter((booking) => booking.status === "Disetujui" || booking.status === "Dalam Proses").length,
+        completedBookings: schoolBookings.filter((booking) => booking.status === "Selesai").length,
         totalDocuments: schoolDocuments.length,
         totalHistories: histories.filter((history) => {
           if (history.schoolId) {
@@ -89,174 +96,296 @@ export default function AdminSekolahPage() {
     });
   }, [registeredSchools, bookings, documents, histories]);
 
-  const detailSchoolData = detailSchool ? {
-    info: schools.find((s) => s.id === detailSchool),
-    registered: registeredSchools.find((s) => s.id === detailSchool),
-    bookings: bookings.filter((booking) => {
-      if (booking.schoolId) {
-        return booking.schoolId === detailSchool;
-      }
-      const school = schools.find((item) => item.id === detailSchool);
-      return booking.school === school?.name;
-    }),
-    histories: histories.filter((history) => {
-      if (history.schoolId) {
-        return history.schoolId === detailSchool;
-      }
-      const school = schools.find((item) => item.id === detailSchool);
-      return history.school === school?.name;
-    }),
-    documents: (() => {
-      const school = schools.find((item) => item.id === detailSchool);
-      if (!school) return [];
+  const detailSchoolData = detailSchool
+    ? {
+        info: schools.find((school) => school.id === detailSchool),
+        registered: registeredSchools.find((school) => school.id === detailSchool),
+        bookings: bookings.filter((booking) => {
+          if (booking.schoolId) {
+            return booking.schoolId === detailSchool;
+          }
+          const school = schools.find((item) => item.id === detailSchool);
+          return booking.school === school?.name;
+        }),
+        histories: histories.filter((history) => {
+          if (history.schoolId) {
+            return history.schoolId === detailSchool;
+          }
+          const school = schools.find((item) => item.id === detailSchool);
+          return history.school === school?.name;
+        }),
+        documents: (() => {
+          const school = schools.find((item) => item.id === detailSchool);
+          if (!school) return [];
 
-      return getSchoolDocumentsForAdmin({
-        schoolId: school.id,
-        schoolName: school.name,
-        bookings,
-        documents,
-        histories,
-      });
-    })(),
-  } : null;
+          return getSchoolDocumentsForAdmin({
+            schoolId: school.id,
+            schoolName: school.name,
+            bookings,
+            documents,
+            histories,
+          });
+        })(),
+      }
+    : null;
+
+  const summaryCards = [
+    {
+      label: "Total Sekolah",
+      value: schools.length,
+      accent: "text-[#25365f]",
+      description: "Akun sekolah dan entitas legacy yang terdeteksi.",
+    },
+    {
+      label: "Perlu Tindak Lanjut",
+      value: schools.filter((school) => school.pendingBookings > 0).length,
+      accent: "text-[#9b6a1d]",
+      description: "Sekolah yang masih punya booking menunggu.",
+    },
+    {
+      label: "Sedang Aktif",
+      value: schools.filter((school) => school.activeBookings > 0).length,
+      accent: "text-[#35557c]",
+      description: "Sekolah dengan sesi berjalan atau sudah disetujui.",
+    },
+    {
+      label: "Arsip Tercatat",
+      value: schools.reduce((total, school) => total + school.totalDocuments, 0),
+      accent: "text-[#2f5a4b]",
+      description: "Dokumen yang sudah masuk ke sistem.",
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6d7998]">Dashboard Admin &rsaquo; Daftar Sekolah</p>
-        <h2 className="mt-1 font-[family-name:var(--font-fraunces)] text-[22px] font-bold text-[#25365f]">
+    <div className="space-y-6 text-[#25365f]">
+      <header className="space-y-2">
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6d7998]">
+          Dashboard Admin &rsaquo; Daftar Sekolah
+        </p>
+        <h2 className="font-[family-name:var(--font-fraunces)] text-[24px] font-bold text-[#25365f]">
           Daftar Sekolah
         </h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-[#6d7998]">
-          Pantau semua sekolah yang terdaftar dan aktivitas booking mereka.
+        <p className="max-w-[700px] text-[14px] leading-7 text-[#5d6780]">
+          Pantau sekolah yang aktif, lihat beban antrean mereka, dan buka detail
+          aktivitas tanpa harus menggali data dari banyak tabel.
         </p>
-      </div>
+      </header>
 
-      {/* School Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {summaryCards.map((card) => (
+          <article
+            key={card.label}
+            className="rounded-[24px] border border-[#e2dde8] bg-white px-5 py-4 shadow-[0_18px_40px_-32px_rgba(37,54,95,0.4)]"
+          >
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7b879f]">
+              {card.label}
+            </p>
+            <p className={`mt-3 font-[var(--font-fraunces)] text-[34px] font-medium leading-none ${card.accent}`}>
+              {card.value}
+            </p>
+            <p className="mt-2 text-[13px] leading-6 text-[#6d7998]">{card.description}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {schools.map((school) => (
-          <div key={school.id} className="rounded-2xl border border-[#e1dce8] bg-white p-5 transition-shadow hover:shadow-lg">
-            <div className="flex items-start justify-between">
+          <article
+            key={school.id}
+            className="rounded-[28px] border border-[#e2dde8] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-[14px] font-bold text-[#25365f]">{school.name}</h3>
-                <p className="mt-1 text-[12px] text-[#6d7998]">
-                  {school.email ?? "Belum terdaftar"}
-                  {school.npsn ? ` · NPSN ${school.npsn}` : ""}
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#9aa6c4]">
+                  {school.npsn ? `NPSN ${school.npsn}` : "Profil Sekolah"}
+                </p>
+                <h3 className="mt-3 font-[var(--font-fraunces)] text-[26px] font-medium leading-[1.08] text-[#121d35]">
+                  {school.name}
+                </h3>
+                <p className="mt-2 text-[13px] leading-6 text-[#6d7998]">
+                  {school.email ?? "Belum ada email terdaftar."}
                 </p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f5f3f7]">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a6baf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f3f2f8] text-[#35557c]">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M9 9h.01M15 9h.01M9 13h.01M15 13h.01" />
                 </svg>
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <div className="rounded-xl bg-[#fffbeb] p-2.5 text-center">
-                <p className="text-[18px] font-bold text-[#92400e]">{school.pendingBookings}</p>
-                <p className="text-[10px] font-bold text-[#b45309]">Menunggu</p>
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              <div className="rounded-2xl bg-[#fff8ed] p-3 text-center">
+                <p className="font-[var(--font-fraunces)] text-[26px] font-medium text-[#9b6a1d]">
+                  {school.pendingBookings}
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9b6a1d]">
+                  Menunggu
+                </p>
               </div>
-              <div className="rounded-xl bg-[#ecfdf5] p-2.5 text-center">
-                <p className="text-[18px] font-bold text-[#065f46]">{school.activeBookings}</p>
-                <p className="text-[10px] font-bold text-[#047857]">Aktif</p>
+              <div className="rounded-2xl bg-[#eef4fb] p-3 text-center">
+                <p className="font-[var(--font-fraunces)] text-[26px] font-medium text-[#35557c]">
+                  {school.activeBookings}
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#35557c]">
+                  Aktif
+                </p>
               </div>
-              <div className="rounded-xl bg-[#f5f3ff] p-2.5 text-center">
-                <p className="text-[18px] font-bold text-[#5b21b6]">{school.completedBookings}</p>
-                <p className="text-[10px] font-bold text-[#6d28d9]">Selesai</p>
+              <div className="rounded-2xl bg-[#edf3ef] p-3 text-center">
+                <p className="font-[var(--font-fraunces)] text-[26px] font-medium text-[#2f5a4b]">
+                  {school.completedBookings}
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#2f5a4b]">
+                  Selesai
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-[#ece6f1] bg-[#faf9fc] p-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9aa6c4]">Booking</p>
+                <p className="mt-2 text-[14px] font-semibold text-[#25365f]">{school.totalBookings}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9aa6c4]">Dokumen</p>
+                <p className="mt-2 text-[14px] font-semibold text-[#25365f]">{school.totalDocuments}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9aa6c4]">Riwayat</p>
+                <p className="mt-2 text-[14px] font-semibold text-[#25365f]">{school.totalHistories}</p>
               </div>
             </div>
 
             <button
               type="button"
-                onClick={() => setDetailSchool(school.id)}
-                className="mt-4 w-full rounded-xl border border-[#d8deeb] py-2.5 text-[12px] font-bold text-[#4a6baf] hover:bg-[#f5f3f7] transition-colors"
-              >
-                Lihat Detail
+              onClick={() => setDetailSchool(school.id)}
+              className="mt-5 w-full rounded-2xl border border-[#d5dbea] bg-[#f9f8fc] py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[#4f5b77] transition-colors hover:bg-[#eef1f8] hover:text-[#25365f]"
+            >
+              Lihat Detail Sekolah
             </button>
-          </div>
+          </article>
         ))}
 
-        {schools.length === 0 && (
-          <div className="col-span-full rounded-2xl border border-[#e1dce8] bg-white p-12 text-center">
-            <p className="text-[13px] text-[#6d7998]">Belum ada sekolah terdaftar.</p>
+        {schools.length === 0 ? (
+          <div className="col-span-full rounded-[28px] border border-[#e2dde8] bg-white p-12 text-center text-[14px] text-[#6d7998]">
+            Belum ada sekolah terdaftar.
           </div>
-        )}
-      </div>
+        ) : null}
+      </section>
 
-      {/* School Detail Modal */}
-      <Modal open={detailSchool !== null} onClose={() => setDetailSchool(null)} title={detailSchoolData?.info?.name ?? "Detail Sekolah"}>
-        {detailSchoolData && (
-          <div className="space-y-4">
-            {/* Registered info */}
-            {detailSchoolData.registered && (
-              <div className="rounded-xl bg-[#f5f3f7] p-3 space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#6d7998]">Info Akun</p>
-                <p className="text-[12px] text-[#4f5b77]">Email: <strong className="text-[#25365f]">{detailSchoolData.registered.email}</strong></p>
-                <p className="text-[12px] text-[#4f5b77]">NPSN: <strong className="text-[#25365f]">{detailSchoolData.registered.npsn}</strong></p>
-                <p className="text-[12px] text-[#4f5b77]">PJ: <strong className="text-[#25365f]">{detailSchoolData.registered.contactName}</strong></p>
-                <p className="text-[12px] text-[#4f5b77]">Telepon: <strong className="text-[#25365f]">{detailSchoolData.registered.phone}</strong></p>
-              </div>
-            )}
+      <Modal
+        open={detailSchool !== null}
+        onClose={() => setDetailSchool(null)}
+        title={detailSchoolData?.info?.name ?? "Detail Sekolah"}
+      >
+        {detailSchoolData ? (
+          <div className="space-y-4 text-[#25365f]">
+            {detailSchoolData.registered ? (
+              <section className="rounded-2xl border border-[#ece6f1] bg-[#f8f7fb] p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#7b879f]">Info Akun</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <p className="text-[13px] leading-6 text-[#5d6780]">
+                    Email
+                    <span className="mt-1 block font-semibold text-[#25365f]">{detailSchoolData.registered.email}</span>
+                  </p>
+                  <p className="text-[13px] leading-6 text-[#5d6780]">
+                    NPSN
+                    <span className="mt-1 block font-semibold text-[#25365f]">{detailSchoolData.registered.npsn ?? "-"}</span>
+                  </p>
+                  <p className="text-[13px] leading-6 text-[#5d6780]">
+                    Penanggung Jawab
+                    <span className="mt-1 block font-semibold text-[#25365f]">{detailSchoolData.registered.contactName}</span>
+                  </p>
+                  <p className="text-[13px] leading-6 text-[#5d6780]">
+                    Telepon
+                    <span className="mt-1 block font-semibold text-[#25365f]">{detailSchoolData.registered.phone}</span>
+                  </p>
+                </div>
+              </section>
+            ) : null}
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-xl bg-[#f5f3f7] p-3 text-center">
-                <p className="text-[18px] font-bold text-[#25365f]">{detailSchoolData.info?.totalBookings ?? 0}</p>
-                <p className="text-[10px] font-bold text-[#6d7998]">Booking</p>
-              </div>
-              <div className="rounded-xl bg-[#f5f3f7] p-3 text-center">
-                <p className="text-[18px] font-bold text-[#25365f]">{detailSchoolData.info?.totalDocuments ?? 0}</p>
-                <p className="text-[10px] font-bold text-[#6d7998]">Dokumen</p>
-              </div>
-              <div className="rounded-xl bg-[#f5f3f7] p-3 text-center">
-                <p className="text-[18px] font-bold text-[#25365f]">{detailSchoolData.info?.totalHistories ?? 0}</p>
-                <p className="text-[10px] font-bold text-[#6d7998]">Riwayat</p>
-              </div>
-            </div>
+            <section className="grid grid-cols-3 gap-3">
+              <article className="rounded-2xl border border-[#ece6f1] bg-white p-4 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9aa6c4]">Booking</p>
+                <p className="mt-2 font-[var(--font-fraunces)] text-[30px] font-medium text-[#25365f]">
+                  {detailSchoolData.info?.totalBookings ?? 0}
+                </p>
+              </article>
+              <article className="rounded-2xl border border-[#ece6f1] bg-white p-4 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9aa6c4]">Dokumen</p>
+                <p className="mt-2 font-[var(--font-fraunces)] text-[30px] font-medium text-[#25365f]">
+                  {detailSchoolData.info?.totalDocuments ?? 0}
+                </p>
+              </article>
+              <article className="rounded-2xl border border-[#ece6f1] bg-white p-4 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9aa6c4]">Riwayat</p>
+                <p className="mt-2 font-[var(--font-fraunces)] text-[30px] font-medium text-[#25365f]">
+                  {detailSchoolData.info?.totalHistories ?? 0}
+                </p>
+              </article>
+            </section>
 
-            {/* Bookings */}
-            <div>
-              <h4 className="text-[13px] font-bold text-[#25365f] mb-2">Riwayat Booking</h4>
-              <div className="max-h-[280px] space-y-2 overflow-y-auto">
-                {detailSchoolData.bookings.length > 0 ? detailSchoolData.bookings.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between rounded-xl bg-[#faf9fc] p-3">
-                    <div>
-                      <p className="text-[12px] font-semibold text-[#25365f]">{b.topic}</p>
-                      <p className="text-[11px] text-[#6d7998]">{b.id} &bull; {formatShortDateID(b.dateISO)} &bull; {b.category ?? "-"}</p>
+            <section>
+              <h4 className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7b879f]">
+                Aktivitas Booking
+              </h4>
+              <div className="mt-3 max-h-[260px] space-y-2 overflow-y-auto">
+                {detailSchoolData.bookings.length > 0 ? (
+                  detailSchoolData.bookings.map((booking) => (
+                    <div key={booking.id} className="flex items-center justify-between rounded-2xl border border-[#ece6f1] bg-[#faf9fc] p-3">
+                      <div>
+                        <p className="text-[13px] font-semibold text-[#25365f]">{booking.topic}</p>
+                        <p className="text-[12px] leading-6 text-[#6d7998]">
+                          {booking.id} • {formatShortDateID(booking.dateISO)} • {booking.category ?? "-"}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${getStatusClasses(booking.status)}`}>
+                        {booking.status}
+                      </span>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${getStatusClasses(b.status)}`}>{b.status}</span>
-                  </div>
-                )) : (
-                  <p className="text-[12px] text-[#6d7998]">Belum ada booking.</p>
+                  ))
+                ) : (
+                  <p className="text-[13px] text-[#6d7998]">Belum ada booking.</p>
                 )}
               </div>
-            </div>
+            </section>
 
-            {/* Histories */}
-            {detailSchoolData.histories.length > 0 && (
-              <div>
-                <h4 className="text-[13px] font-bold text-[#25365f] mb-2">Riwayat Sesi</h4>
-                <div className="max-h-[200px] space-y-2 overflow-y-auto">
-                  {detailSchoolData.histories.map((h) => (
-                    <div key={h.id} className="rounded-xl bg-[#faf9fc] p-3">
-                      <p className="text-[12px] font-semibold text-[#25365f]">{h.title}</p>
-                      <p className="text-[11px] text-[#6d7998]">{h.id} &bull; {formatShortDateID(h.dateISO)} &bull; {h.status}</p>
-                      {h.supervisorNotes && <p className="mt-1 text-[11px] text-[#4a6baf]">Catatan: {h.supervisorNotes}</p>}
+            {detailSchoolData.histories.length > 0 ? (
+              <section>
+                <h4 className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7b879f]">
+                  Riwayat Sesi
+                </h4>
+                <div className="mt-3 max-h-[220px] space-y-2 overflow-y-auto">
+                  {detailSchoolData.histories.map((history) => (
+                    <div key={history.id} className="rounded-2xl border border-[#ece6f1] bg-[#faf9fc] p-3">
+                      <p className="text-[13px] font-semibold text-[#25365f]">{history.title}</p>
+                      <p className="mt-1 text-[12px] leading-6 text-[#6d7998]">
+                        {history.id} • {formatShortDateID(history.dateISO)} • {history.status}
+                      </p>
+                      {history.supervisorNotes ? (
+                        <p className="mt-2 text-[12px] leading-6 text-[#35557c]">
+                          Catatan: {history.supervisorNotes}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              </section>
+            ) : null}
 
-            {detailSchoolData.documents.length > 0 && (
-              <div>
-                <h4 className="text-[13px] font-bold text-[#25365f] mb-2">Dokumen Sekolah</h4>
-                <div className="max-h-[220px] space-y-2 overflow-y-auto">
+            {detailSchoolData.documents.length > 0 ? (
+              <section>
+                <h4 className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7b879f]">
+                  Dokumen Sekolah
+                </h4>
+                <div className="mt-3 max-h-[240px] space-y-2 overflow-y-auto">
                   {detailSchoolData.documents.map((document) => (
-                    <div key={document.id} className="flex items-center justify-between rounded-xl bg-[#faf9fc] p-3">
+                    <div key={document.id} className="flex items-center justify-between rounded-2xl border border-[#ece6f1] bg-[#faf9fc] p-3">
                       <div>
-                        <p className="text-[12px] font-semibold text-[#25365f]">{document.fileName}</p>
-                        <p className="text-[11px] text-[#6d7998]">{document.id} &bull; {document.stage} &bull; {document.uploadedAt}</p>
+                        <p className="text-[13px] font-semibold text-[#25365f]">{document.fileName}</p>
+                        <p className="mt-1 text-[12px] leading-6 text-[#6d7998]">
+                          {document.id} • {document.stage} • {document.uploadedAt}
+                        </p>
                       </div>
                       <span className="rounded-full bg-[#eef1f8] px-3 py-1 text-[10px] font-bold text-[#4f5b77]">
                         {document.reviewStatus ?? "Menunggu Review"}
@@ -264,10 +393,10 @@ export default function AdminSekolahPage() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              </section>
+            ) : null}
           </div>
-        )}
+        ) : null}
       </Modal>
     </div>
   );

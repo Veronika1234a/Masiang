@@ -495,61 +495,7 @@ export function getRiwayatSeed(): RiwayatItem[] {
 }
 
 export function getUserDocumentSeed(): SchoolDocument[] {
-  return [
-    {
-      id: "DOC-001",
-      fileName: "Profil Sekolah UPT SDN 1 Mappak.pdf",
-      uploadedAt: "1 Maret 2026",
-      stage: "Melayani",
-      mimeType: "application/pdf",
-      fileSize: 2_450_000,
-      reviewStatus: "Disetujui",
-      version: 1,
-    },
-    {
-      id: "DOC-002",
-      fileName: "Surat Pengajuan Pendampingan.docx",
-      uploadedAt: "27 Februari 2026",
-      stage: "Melayani",
-      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      fileSize: 540_000,
-      reviewStatus: "Disetujui",
-      version: 1,
-    },
-    {
-      id: "DOC-003",
-      fileName: "Analisis Kebutuhan Sekolah.pdf",
-      uploadedAt: "24 Februari 2026",
-      stage: "Adaptif",
-      mimeType: "application/pdf",
-      fileSize: 1_800_000,
-      reviewStatus: "Disetujui",
-      version: 1,
-    },
-    {
-      id: "DOC-004",
-      fileName: "Berita Acara Pendampingan.pdf",
-      uploadedAt: "18 Februari 2026",
-      stage: "Pelaksanaan",
-      historyId: "RH-001",
-      mimeType: "application/pdf",
-      fileSize: 980_000,
-      reviewStatus: "Menunggu Review",
-      version: 1,
-    },
-    {
-      id: "DOC-005",
-      fileName: "Laporan Refleksi Program.pdf",
-      uploadedAt: "14 Februari 2026",
-      stage: "Laporan",
-      historyId: "RH-002",
-      mimeType: "application/pdf",
-      fileSize: 3_200_000,
-      reviewStatus: "Perlu Revisi",
-      reviewerNotes: "Bagian analisis dampak program perlu diperdalam. Tambahkan data kuantitatif dari hasil asesmen siswa.",
-      version: 1,
-    },
-  ];
+  return [];
 }
 
 export function getSchoolProfile(): SchoolProfile {

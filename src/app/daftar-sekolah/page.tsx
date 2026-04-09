@@ -462,12 +462,11 @@ export default function RegisterPage() {
             <div className="mt-4 rounded-2xl border border-[#bad6c0] bg-[#eff8f1] px-4 py-3.5 text-[13px] leading-6 text-[#245535]">
               <p className="m-0 font-bold">Registrasi berhasil!</p>
               <p className="mt-1.5">
-                Akun sekolah Anda sudah dibuat. Silakan{" "}
+                Akun sekolah Anda sudah dibuat. Tunggu verifikasi operator sekolah, lalu silakan{" "}
                 <Link href="/login" className="font-bold underline underline-offset-[0.18em]">
                   login
                 </Link>{" "}
-                untuk masuk ke dashboard. Jika akses belum tersedia, periksa
-                apakah akun masih menunggu verifikasi email.
+                untuk masuk ke dashboard.
               </p>
             </div>
           ) : null}

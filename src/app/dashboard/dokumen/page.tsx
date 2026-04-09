@@ -19,9 +19,16 @@ const ALLOWED_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/zip",
   "application/x-zip-compressed",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
 ];
 const MAX_SIZE = 10 * 1024 * 1024;
-const FILE_EXTENSION_REGEX = /\.(pdf|docx|xlsx|zip)$/i;
+const FILE_EXTENSION_REGEX = /\.(pdf|docx|xlsx|zip|jpg|jpeg|png|gif|webp|mp4|webm|mov)$/i;
 
 function getStageClasses(stage: DocumentStage) {
   if (stage === "Melayani") return "bg-[#eef4ff] text-[#496b9f]";
@@ -56,8 +63,11 @@ export default function DashboardDokumenPage() {
   const [uploadStage, setUploadStage] = useState<DocumentStage>("Melayani");
   const [deleteTarget, setDeleteTarget] = useState<SchoolDocument | null>(null);
   const [reviseTarget, setReviseTarget] = useState<SchoolDocument | null>(null);
+  const [linkTitle, setLinkTitle] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
   const [showChecklist, setShowChecklist] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLinkUploading, setIsLinkUploading] = useState(false);
 
   const filteredDocuments = useMemo(() => {
     const nk = keyword.trim().toLowerCase();
@@ -77,7 +87,7 @@ export default function DashboardDokumenPage() {
     try {
       for (const file of files) {
         if (!isAllowedFile(file)) {
-          addToast(`Format "${file.name}" tidak didukung. Gunakan PDF, DOCX, XLSX, atau ZIP.`, "error");
+          addToast(`Format "${file.name}" tidak didukung. Gunakan PDF, DOCX, XLSX, ZIP, JPG, PNG, GIF, WEBP, MP4, WEBM, atau MOV.`, "error");
           continue;
         }
         if (file.size > MAX_SIZE) {
@@ -105,7 +115,7 @@ export default function DashboardDokumenPage() {
     const file = e.target.files?.[0];
     if (file && reviseTarget) {
       if (!isAllowedFile(file)) {
-        addToast(`Format "${file.name}" tidak didukung. Gunakan PDF, DOCX, XLSX, atau ZIP.`, "error");
+        addToast(`Format "${file.name}" tidak didukung. Gunakan PDF, DOCX, XLSX, ZIP, JPG, PNG, GIF, WEBP, MP4, WEBM, atau MOV.`, "error");
         e.target.value = "";
         return;
       }
@@ -122,6 +132,38 @@ export default function DashboardDokumenPage() {
       }
     }
     e.target.value = "";
+  };
+
+  const handleLinkUpload = async () => {
+    const title = linkTitle.trim();
+    const nextUrl = linkUrl.trim();
+
+    if (!title || !nextUrl) {
+      addToast("Judul dan tautan wajib diisi.", "error");
+      return;
+    }
+
+    try {
+      const parsedUrl = new URL(nextUrl);
+      if (!/^https?:$/i.test(parsedUrl.protocol)) {
+        addToast("Tautan harus diawali http:// atau https://.", "error");
+        return;
+      }
+    } catch {
+      addToast("Format tautan tidak valid.", "error");
+      return;
+    }
+
+    setIsLinkUploading(true);
+    try {
+      await uploadDocument(title, uploadStage, undefined, "text/uri-list", undefined, undefined, nextUrl);
+      setLinkTitle("");
+      setLinkUrl("");
+    } catch {
+      // Error toast is handled in context.
+    } finally {
+      setIsLinkUploading(false);
+    }
   };
 
   const checklistData = useMemo(() => {
@@ -194,11 +236,41 @@ export default function DashboardDokumenPage() {
                 </label>
               </div>
               <div className="flex flex-wrap gap-2">
-                <input ref={inputRef} type="file" multiple accept=".pdf,.docx,.xlsx,.zip" onChange={onUpload} className="hidden" />
+                <input ref={inputRef} type="file" multiple accept=".pdf,.docx,.xlsx,.zip,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov" onChange={onUpload} className="hidden" />
                 <button type="button" onClick={() => inputRef.current?.click()} disabled={isUploading} className="rounded-xl border border-[#c79a3c] bg-[#d2ac50] px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white hover:-translate-y-0.5 hover:bg-[#b8933d] hover:shadow-md transition-all disabled:cursor-not-allowed disabled:opacity-60">
                   {isUploading ? "Mengunggah..." : "Upload Dokumen"}
                 </button>
                 <button type="button" onClick={() => setShowChecklist(true)} className="rounded-xl border border-[#cfd5e6] bg-white px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[#4f5b77] hover:bg-[#eef1f8]">Checklist</button>
+              </div>
+              <div className="grid gap-3 rounded-2xl border border-dashed border-[#d7ddea] bg-white p-4 md:grid-cols-[1.1fr_1.2fr_auto] md:items-end">
+                <label className="grid gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Judul Link</span>
+                  <input
+                    type="text"
+                    value={linkTitle}
+                    onChange={(event) => setLinkTitle(event.target.value)}
+                    placeholder="Contoh: Rekap rapor sekolah"
+                    className="min-h-11 rounded-xl border border-[#d8deeb] bg-white px-3 text-[14px] text-[#313f61] outline-none focus:border-[#b9c7de]"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Tautan</span>
+                  <input
+                    type="url"
+                    value={linkUrl}
+                    onChange={(event) => setLinkUrl(event.target.value)}
+                    placeholder="https://..."
+                    className="min-h-11 rounded-xl border border-[#d8deeb] bg-white px-3 text-[14px] text-[#313f61] outline-none focus:border-[#b9c7de]"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void handleLinkUpload()}
+                  disabled={isLinkUploading}
+                  className="rounded-xl border border-[#7b879f] bg-[#4f5b77] px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white hover:bg-[#3f4a63] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLinkUploading ? "Menyimpan..." : "Tambah Link"}
+                </button>
               </div>
             </div>
             <p className="text-[12px] text-[#6d7998]">
@@ -243,7 +315,7 @@ export default function DashboardDokumenPage() {
                   )}
                   {doc.reviewStatus === "Perlu Revisi" && (
                     <>
-                      <input ref={reviseRef} type="file" accept=".pdf,.docx,.xlsx,.zip" onChange={onRevise} className="hidden" />
+                      <input ref={reviseRef} type="file" accept=".pdf,.docx,.xlsx,.zip,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov" onChange={onRevise} className="hidden" />
                       <button type="button" onClick={() => { setReviseTarget(doc); reviseRef.current?.click(); }} className="rounded-xl border border-[#c79a3c] bg-[#d2ac50] px-4 py-3 text-[11px] font-bold uppercase text-white hover:bg-[#b8933d]">Upload Revisi</button>
                     </>
                   )}

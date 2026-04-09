@@ -6,6 +6,10 @@ const seedDocumentMap: Record<string, string> = {
   "DOC-005": "/api/seed-documents/DOC-005",
 };
 
+export function isDirectDownloadPath(path?: string | null): boolean {
+  return Boolean(path && (/^https?:\/\//i.test(path) || path.startsWith("/")));
+}
+
 export async function uploadFile(
   schoolId: string,
   file: File,
@@ -44,7 +48,7 @@ export function getSeedDocumentDownloadUrl(
   documentId: string,
   storagePath?: string | null,
 ): string | null {
-  if (storagePath?.startsWith("/")) {
+  if (storagePath && isDirectDownloadPath(storagePath)) {
     return storagePath;
   }
 

@@ -17,6 +17,7 @@ interface MarketingHeaderProps {
   navItems: NavItem[];
   loginHref: string;
   registerHref: string;
+  showLogo?: boolean;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -28,6 +29,7 @@ export function MarketingHeader({
   navItems,
   loginHref,
   registerHref,
+  showLogo = true,
 }: MarketingHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -100,8 +102,10 @@ export function MarketingHeader({
 
   return (
     <header className={styles.header}>
-      <Link className={styles.brand} href="/">
-        <Image src={logoSrc} alt={`${brandName} logo`} width={54} height={54} />
+      <Link className={`${styles.brand} ${!showLogo ? styles.brandTextOnly : ""}`} href="/">
+        {showLogo ? (
+          <Image src={logoSrc} alt={`${brandName} logo`} width={54} height={54} />
+        ) : null}
         <span>{brandName}</span>
       </Link>
 

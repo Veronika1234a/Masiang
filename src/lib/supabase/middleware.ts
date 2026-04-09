@@ -29,11 +29,6 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Refresh the session so it doesn't expire
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { pathname } = request.nextUrl;
   const isAdminDashboard =
     pathname === "/dashboard-admin" || pathname.startsWith("/dashboard-admin/");
@@ -48,6 +43,15 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
+  let user = null;
+  try {
+    // Refresh the session so it doesn't expire.
+    const result = await supabase.auth.getUser();
+    user = result.data.user ?? null;
+  } catch {
+    user = null;
+  }
+
   if (!user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
@@ -58,13 +62,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  let role: string | null = null;
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    role = profile?.role ?? null;
+  } catch {
+    role = null;
+  }
 
-  const role = profile?.role;
+  if (!role) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set(
+      "redirectTo",
+      buildProtectedRedirectTarget(pathname, request.nextUrl.search),
+    );
+    return NextResponse.redirect(loginUrl);
+  }
 
   if (isAdminDashboard && role !== "admin") {
     const redirectUrl = request.nextUrl.clone();

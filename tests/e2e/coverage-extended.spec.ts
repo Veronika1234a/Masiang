@@ -37,7 +37,7 @@ test("admin can reject a booking and school sees the rejected result", async ({ 
 
   await login(page, "admin@example.com");
   await page.goto("/dashboard-admin/booking");
-  await page.getByPlaceholder("Cari sekolah, topik, atau ID...").fill("BK-401");
+  await page.getByPlaceholder("Cari sekolah, topik, atau ID booking").fill("BK-401");
 
   const bookingRow = page.locator("tr", { hasText: "BK-401" });
   await expect(bookingRow).toContainText("Pendampingan Asesmen Diagnostik");

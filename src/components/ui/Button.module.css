@@ -56,8 +56,8 @@
 }
 
 .primary {
-  background: linear-gradient(180deg, #ddb86b 0%, #d2a24b 100%);
-  border-color: #b8933d;
+  background: linear-gradient(180deg, #ffac44 0%, #ff9409 100%);
+  border-color: #e67f05;
   color: #ffffff;
 }
 
@@ -80,8 +80,8 @@
 }
 
 .primary:hover {
-  background: #b8933d;
-  border-color: #a28235;
+  background: #e98105;
+  border-color: #cf7304;
 }
 
 .ghost:hover {

@@ -79,6 +79,7 @@ interface DashboardContextValue {
     mimeType?: string,
     bookingId?: string,
     file?: File,
+    linkUrl?: string,
   ): Promise<SchoolDocument>;
   deleteDocument(id: string): Promise<void>;
   replaceDocument(
@@ -360,12 +361,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       recipientUserIds?: string[],
     ) => {
       if (!user) return;
-      const requestedTargets = recipientUserIds?.length ? recipientUserIds : [user.id];
-      const uniqueTargets = Array.from(new Set(requestedTargets.filter(Boolean)));
+
+      const explicitTargets = recipientUserIds?.filter(Boolean) ?? [];
       const targets =
         user.role === "admin"
-          ? uniqueTargets
-          : uniqueTargets.filter((targetUserId) => targetUserId === user.id);
+          ? Array.from(new Set(explicitTargets))
+          : explicitTargets.includes(user.id)
+            ? [user.id]
+            : [];
 
       if (targets.length === 0) {
         return;
@@ -597,7 +600,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           return null;
         }
 
-        const recipientUserIds = matchedBooking.schoolId ? [matchedBooking.schoolId] : [user.id];
+        const recipientUserIds = schoolId ? [schoolId] : [user.id];
 
         await pushNotif(
           "Sesi Selesai",
@@ -648,6 +651,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       mimeType?: string,
       bookingId?: string,
       file?: File,
+      linkUrl?: string,
     ): Promise<SchoolDocument> => {
       if (!user) throw new Error("Not authenticated");
 
@@ -660,6 +664,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             throw new Error(uploadResult.error);
           }
           storagePath = uploadResult.path;
+        } else if (linkUrl) {
+          storagePath = linkUrl;
         }
 
         const doc: SchoolDocument = {
@@ -691,7 +697,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         return doc;
       } catch (err) {
         setDocuments((prev) => prev.filter((item) => item.id !== id));
-        if (storagePath) {
+        if (storagePath && !storageSvc.isDirectDownloadPath(storagePath)) {
           try {
             await storageSvc.deleteFile(storagePath);
           } catch (cleanupError) {
@@ -740,7 +746,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         throw err;
       }
 
-      if (doc?.storagePath) {
+      if (doc?.storagePath && !storageSvc.isDirectDownloadPath(doc.storagePath)) {
         try {
           await storageSvc.deleteFile(doc.storagePath);
         } catch (err) {
@@ -833,7 +839,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         return doc;
       } catch (err) {
         console.error("replaceDocument error:", err);
-        if (storagePath) {
+        if (storagePath && !storageSvc.isDirectDownloadPath(storagePath)) {
           try {
             await storageSvc.deleteFile(storagePath);
           } catch (cleanupError) {
@@ -1230,9 +1236,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           "booking",
           [booking.schoolId],
         );
+        addToast("Catatan pengawas berhasil disimpan.");
+      } else {
+        addToast("Catatan pengawas disimpan, tetapi sekolah tidak dapat dinotifikasi karena data kepemilikan belum lengkap.", "info");
       }
-
-      addToast("Catatan pengawas berhasil disimpan.");
     },
     [bookings, histories, pushNotif, addToast],
   );

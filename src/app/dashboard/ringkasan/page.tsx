@@ -99,16 +99,16 @@ export default function DashboardRingkasanPage() {
   }
 
   const quickActions = [
-    { label: "Booking Baru", href: "/dashboard/booking-baru", icon: (
+    { label: "Booking Baru", description: "Ajukan sesi baru saat kebutuhan sekolah sudah siap.", href: "/dashboard/booking-baru", icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
     )},
-    { label: "Upload Dokumen", href: "/dashboard/dokumen", icon: (
+    { label: "Upload Dokumen", description: "Lengkapi berkas tahap aktif tanpa harus cari menu lain.", href: "/dashboard/dokumen", icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
     )},
-    { label: "Lihat Jadwal", href: "/dashboard/booking-jadwal", icon: (
+    { label: "Lihat Jadwal", description: "Cek sesi mendatang dan pastikan slot tidak bentrok.", href: "/dashboard/booking-jadwal", icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
     )},
-    { label: "Riwayat", href: "/dashboard/riwayat", icon: (
+    { label: "Riwayat", description: "Lihat sesi terdahulu, laporan, dan tindak lanjut.", href: "/dashboard/riwayat", icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
     )},
   ];
@@ -132,17 +132,20 @@ export default function DashboardRingkasanPage() {
 
         {/* ─── QUICK ACTIONS + ALERTS (side by side) ─── */}
         <div className={`mb-10 grid gap-4 ${alerts.length > 0 ? "lg:grid-cols-[1fr_320px]" : ""}`}>
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 self-start">
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 self-start">
             {quickActions.map((qa) => (
               <Link
                 key={qa.label}
                 href={qa.href}
-                className="group flex items-center gap-3 rounded-2xl border border-[#e1dce8] bg-white px-4 py-3.5 transition-all hover:border-[#c5cee0] hover:shadow-sm"
+                className="group flex items-start gap-4 rounded-2xl border border-[#e1dce8] bg-white px-4 py-4 transition-all hover:border-[#c5cee0] hover:shadow-sm"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f3f2f8] text-[#4a6baf] transition-colors group-hover:bg-[#e8e4f0] group-hover:text-[#25365f]">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f3f2f8] text-[#4a6baf] transition-colors group-hover:bg-[#e8e4f0] group-hover:text-[#25365f]">
                   {qa.icon}
                 </div>
-                <span className="text-[12px] font-bold text-[#4f5b77] group-hover:text-[#25365f]">{qa.label}</span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-bold text-[#25365f] group-hover:text-[#1c2a46]">{qa.label}</p>
+                  <p className="mt-1 text-[12px] leading-6 text-[#6d7998]">{qa.description}</p>
+                </div>
               </Link>
             ))}
           </section>

@@ -8,11 +8,11 @@ import { formatLongDateID } from "@/lib/userDashboardData";
 
 function getStatusClasses(status: string) {
   switch (status) {
-    case "Menunggu": return "bg-[#fef3c7] text-[#92400e]";
-    case "Disetujui": return "bg-[#d1fae5] text-[#065f46]";
-    case "Dalam Proses": return "bg-[#dbeafe] text-[#1e40af]";
-    case "Selesai": return "bg-[#e8e0f0] text-[#5b21b6]";
-    case "Ditolak": return "bg-[#fee2e2] text-[#991b1b]";
+    case "Menunggu": return "bg-[#fff6e6] text-[#9b6a1d]";
+    case "Disetujui": return "bg-[#e8f3ee] text-[#2b5f52]";
+    case "Dalam Proses": return "bg-[#eef4fb] text-[#35557c]";
+    case "Selesai": return "bg-[#edf3ef] text-[#2f5a4b]";
+    case "Ditolak": return "bg-[#fdf0ef] text-[#9b4b45]";
     case "Dibatalkan": return "bg-[#f3f4f6] text-[#6b7280]";
     default: return "bg-[#f3f4f6] text-[#6b7280]";
   }
@@ -56,7 +56,7 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ b
         </nav>
         <div className="rounded-2xl border border-[#e1dce8] bg-white p-12 text-center">
           <p className="text-[15px] text-[#6d7998]">Booking tidak ditemukan.</p>
-          <Link href="/dashboard-admin/booking" className="mt-4 inline-block text-[13px] font-bold text-[#4a6baf] hover:text-[#25365f]">
+          <Link href="/dashboard-admin/booking" className="mt-4 inline-block text-[13px] font-bold text-[#35557c] hover:text-[#25365f]">
             Kembali ke daftar booking
           </Link>
         </div>
@@ -119,15 +119,15 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ b
         <div className="flex flex-wrap gap-2">
           {booking.status === "Menunggu" && (
             <>
-              <button type="button" onClick={() => { void runAction(`approve-${booking.id}`, () => approveBooking(booking.id)); }} disabled={busyActionKey === `approve-${booking.id}`} className="rounded-xl bg-[#065f46] px-4 py-2.5 text-[12px] font-bold text-white hover:bg-[#047857]">Setujui</button>
-              <button type="button" onClick={() => { setRejectModal(true); setRejectReason(""); }} className="rounded-xl bg-[#991b1b] px-4 py-2.5 text-[12px] font-bold text-white hover:bg-[#b91c1c]">Tolak</button>
+              <button type="button" onClick={() => { void runAction(`approve-${booking.id}`, () => approveBooking(booking.id)); }} disabled={busyActionKey === `approve-${booking.id}`} className="rounded-xl bg-[#d2ac50] px-4 py-2.5 text-[12px] font-bold text-white transition-colors hover:bg-[#b8933d]">Setujui</button>
+              <button type="button" onClick={() => { setRejectModal(true); setRejectReason(""); }} className="rounded-xl bg-[#b86b63] px-4 py-2.5 text-[12px] font-bold text-white transition-colors hover:bg-[#9f5a53]">Tolak</button>
             </>
           )}
           {booking.status === "Disetujui" && (
-            <button type="button" onClick={() => { void runAction(`start-${booking.id}`, () => startSession(booking.id)); }} disabled={busyActionKey === `start-${booking.id}`} className="rounded-xl bg-[#1e40af] px-4 py-2.5 text-[12px] font-bold text-white hover:bg-[#1d4ed8]">Mulai Sesi</button>
+            <button type="button" onClick={() => { void runAction(`start-${booking.id}`, () => startSession(booking.id)); }} disabled={busyActionKey === `start-${booking.id}`} className="rounded-xl bg-[#304878] px-4 py-2.5 text-[12px] font-bold text-white transition-colors hover:bg-[#25365f]">Mulai Sesi</button>
           )}
           {booking.status === "Dalam Proses" && (
-            <button type="button" onClick={() => { void runAction(`complete-${booking.id}`, () => confirmBookingDone(booking.id)); }} disabled={busyActionKey === `complete-${booking.id}`} className="rounded-xl bg-[#5b21b6] px-4 py-2.5 text-[12px] font-bold text-white hover:bg-[#6d28d9]">Tandai Selesai</button>
+            <button type="button" onClick={() => { void runAction(`complete-${booking.id}`, () => confirmBookingDone(booking.id)); }} disabled={busyActionKey === `complete-${booking.id}`} className="rounded-xl bg-[#2f5a4b] px-4 py-2.5 text-[12px] font-bold text-white transition-colors hover:bg-[#25463a]">Tandai Selesai</button>
           )}
           {(booking.status === "Dalam Proses" || booking.status === "Selesai") && (
             <button type="button" onClick={() => { setSupervisorNotes(booking.supervisorNotes ?? ""); setNotesModal(true); }} className="rounded-xl border border-[#d8deeb] bg-white px-4 py-2.5 text-[12px] font-bold text-[#4f5b77] hover:bg-[#f5f3f7]">Catatan Pengawas</button>
@@ -157,23 +157,23 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ b
 
       {/* Supervisor Notes + Cancel Reason */}
       {booking.supervisorNotes && (
-        <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#1e40af]">Catatan Pengawas</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-[#1e3a5f]">{booking.supervisorNotes}</p>
+        <div className="rounded-2xl border border-[#d6dfef] bg-[#eef4fb] p-5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#35557c]">Catatan Pengawas</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-[#304878]">{booking.supervisorNotes}</p>
         </div>
       )}
       {booking.cancelReason && (
-        <div className="rounded-2xl border border-[#fee2e2] bg-[#fef2f2] p-5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#991b1b]">Alasan {booking.status === "Ditolak" ? "Penolakan" : "Pembatalan"}</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-[#7f1d1d]">{booking.cancelReason}</p>
+        <div className="rounded-2xl border border-[#efd6d3] bg-[#fdf0ef] p-5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#9b4b45]">Alasan {booking.status === "Ditolak" ? "Penolakan" : "Pembatalan"}</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-[#8b544f]">{booking.cancelReason}</p>
         </div>
       )}
 
       {/* Rating */}
       {booking.rating && (
-        <div className="rounded-2xl border border-[#e8e0f0] bg-[#f5f3ff] p-5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#5b21b6]">Rating & Feedback</p>
-          <p className="mt-1 text-[14px] font-bold text-[#5b21b6]">{"★".repeat(booking.rating)}{"☆".repeat(5 - booking.rating)}</p>
+        <div className="rounded-2xl border border-[#ead7b0] bg-[#fff8ed] p-5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#9b6a1d]">Rating & Feedback</p>
+          <p className="mt-1 text-[14px] font-bold text-[#9b6a1d]">{"★".repeat(booking.rating)}{"☆".repeat(5 - booking.rating)}</p>
           {booking.feedback && <p className="mt-1 text-[13px] text-[#4f5b77]">{booking.feedback}</p>}
         </div>
       )}
@@ -217,9 +217,9 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ b
                   <p className="text-[11px] text-[#6d7998]">{d.id} &bull; {d.uploadedAt} &bull; v{d.version ?? 1}</p>
                 </div>
                 <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${
-                  d.reviewStatus === "Disetujui" ? "bg-[#d1fae5] text-[#065f46]" :
-                  d.reviewStatus === "Perlu Revisi" ? "bg-[#fef3c7] text-[#92400e]" :
-                  "bg-[#dbeafe] text-[#1e40af]"
+                  d.reviewStatus === "Disetujui" ? "bg-[#e8f3ee] text-[#2b5f52]" :
+                  d.reviewStatus === "Perlu Revisi" ? "bg-[#fff6e6] text-[#9b6a1d]" :
+                  "bg-[#eef4fb] text-[#35557c]"
                 }`}>{d.reviewStatus ?? "—"}</span>
               </div>
             ))}
@@ -233,10 +233,10 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ b
       <Modal open={rejectModal} onClose={() => setRejectModal(false)} title="Tolak Booking" footer={
         <>
           <button type="button" onClick={() => setRejectModal(false)} className="rounded-xl border border-[#d8deeb] px-4 py-2 text-[13px] font-bold text-[#4f5b77] hover:bg-[#f5f3f7]">Batal</button>
-          <button type="button" onClick={handleReject} disabled={!rejectReason.trim() || busyActionKey === `reject-${bookingId}`} className="rounded-xl bg-[#991b1b] px-4 py-2 text-[13px] font-bold text-white hover:bg-[#b91c1c] disabled:opacity-40">Konfirmasi Tolak</button>
+          <button type="button" onClick={handleReject} disabled={!rejectReason.trim() || busyActionKey === `reject-${bookingId}`} className="rounded-xl bg-[#b86b63] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#9f5a53] disabled:opacity-40">Konfirmasi Tolak</button>
         </>
       }>
-        <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Alasan penolakan..." rows={3} className="w-full rounded-xl border border-[#d8deeb] px-4 py-3 text-[13px] text-[#25365f] placeholder:text-[#a3adc2] focus:border-[#4a6baf] focus:outline-none" />
+        <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Alasan penolakan..." rows={3} className="w-full rounded-xl border border-[#d8deeb] px-4 py-3 text-[13px] text-[#25365f] placeholder:text-[#a3adc2] focus:border-[#35557c] focus:outline-none" />
       </Modal>
 
       {/* Notes Modal */}
@@ -246,7 +246,7 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ b
           <button type="button" onClick={handleSaveNotes} disabled={!supervisorNotes.trim() || busyActionKey === `notes-${bookingId}`} className="rounded-xl bg-[#25365f] px-4 py-2 text-[13px] font-bold text-white hover:bg-[#1d2741] disabled:opacity-40">Simpan</button>
         </>
       }>
-        <textarea value={supervisorNotes} onChange={(e) => setSupervisorNotes(e.target.value)} placeholder="Catatan hasil observasi, rekomendasi..." rows={4} className="w-full rounded-xl border border-[#d8deeb] px-4 py-3 text-[13px] text-[#25365f] placeholder:text-[#a3adc2] focus:border-[#4a6baf] focus:outline-none" />
+        <textarea value={supervisorNotes} onChange={(e) => setSupervisorNotes(e.target.value)} placeholder="Catatan hasil observasi, rekomendasi..." rows={4} className="w-full rounded-xl border border-[#d8deeb] px-4 py-3 text-[13px] text-[#25365f] placeholder:text-[#a3adc2] focus:border-[#35557c] focus:outline-none" />
       </Modal>
     </div>
   );

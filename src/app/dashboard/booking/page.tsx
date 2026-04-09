@@ -80,6 +80,7 @@ export default function DashboardBookingPage() {
   );
 
   const summary = useMemo(() => getBookingSummary(bookings), [bookings]);
+  const hasActiveFilters = keyword.trim().length > 0 || statusFilter !== "Semua" || Boolean(dateFilter);
   const selectedBooking =
     filteredBookings.find((item) => item.id === selectedBookingId) ??
     filteredBookings[0] ?? null;
@@ -152,21 +153,21 @@ export default function DashboardBookingPage() {
             <div className="grid gap-4 md:grid-cols-4">
               <label className="grid gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Kata Kunci</span>
-                <input type="text" value={keyword} onChange={(e) => { setKeyword(e.target.value); setCurrentPage(1); }} placeholder="Cari sekolah, topik, atau ID" className="min-h-11 rounded-xl border border-[#d8deeb] bg-white px-3 text-[14px] text-[#313f61] outline-none transition-colors focus:border-[#b9c7de]" />
+                <input type="text" value={keyword} onChange={(e) => { setKeyword(e.target.value); setCurrentPage(1); }} placeholder="Cari sekolah, topik, atau ID" className="min-h-12 rounded-2xl border border-[#d8deeb] bg-white px-4 text-[14px] font-medium text-[#313f61] outline-none transition-colors focus:border-[#b9c7de]" />
               </label>
               <label className="grid gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Status</span>
-                <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as BookingStatus | "Semua"); setCurrentPage(1); }} className="min-h-11 rounded-xl border border-[#d8deeb] bg-white px-3 text-[14px] text-[#313f61] outline-none transition-colors focus:border-[#b9c7de]">
+                <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as BookingStatus | "Semua"); setCurrentPage(1); }} className="min-h-12 rounded-2xl border border-[#d8deeb] bg-white px-4 text-[14px] font-medium text-[#313f61] outline-none transition-colors focus:border-[#b9c7de]">
                   {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </label>
               <label className="grid gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Tanggal</span>
-                <input type="date" value={dateFilter} onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }} className="min-h-11 rounded-xl border border-[#d8deeb] bg-white px-3 text-[14px] text-[#313f61] outline-none transition-colors focus:border-[#b9c7de]" />
+                <input type="date" value={dateFilter} onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }} className="min-h-12 rounded-2xl border border-[#d8deeb] bg-white px-4 text-[14px] font-medium text-[#313f61] outline-none transition-colors focus:border-[#b9c7de]" />
               </label>
               <label className="grid gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Urutkan</span>
-                <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} className="min-h-11 rounded-xl border border-[#d8deeb] bg-white px-3 text-[14px] text-[#313f61] outline-none transition-colors focus:border-[#b9c7de]">
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} className="min-h-12 rounded-2xl border border-[#d8deeb] bg-white px-4 text-[14px] font-medium text-[#313f61] outline-none transition-colors focus:border-[#b9c7de]">
                   <option value="date-desc">Terbaru</option>
                   <option value="date-asc">Terlama</option>
                   <option value="status">Status</option>
@@ -179,10 +180,51 @@ export default function DashboardBookingPage() {
               <button type="button" onClick={resetFilters} className="rounded-xl border border-[#d8deeb] bg-[#f3f2f8] px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[#4f5b77] transition-colors duration-300 hover:bg-[#e9edf5] hover:text-[#25365f]">Reset</button>
             </div>
           </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#ebe6f0] pt-4">
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#7b879f]">Filter Aktif</span>
+            {keyword.trim() ? (
+              <span className="rounded-full border border-[#d8deeb] bg-white px-3 py-1.5 text-[12px] font-medium text-[#4f5b77]">
+                Kata kunci: {keyword.trim()}
+              </span>
+            ) : null}
+            {statusFilter !== "Semua" ? (
+              <span className="rounded-full border border-[#d8deeb] bg-white px-3 py-1.5 text-[12px] font-medium text-[#4f5b77]">
+                Status: {statusFilter}
+              </span>
+            ) : null}
+            {dateFilter ? (
+              <span className="rounded-full border border-[#d8deeb] bg-white px-3 py-1.5 text-[12px] font-medium text-[#4f5b77]">
+                Tanggal: {formatLongDateID(dateFilter)}
+              </span>
+            ) : null}
+            {!hasActiveFilters ? (
+              <span className="text-[13px] text-[#6d7998]">Belum ada filter tambahan. Semua booking ditampilkan.</span>
+            ) : null}
+          </div>
         </section>
 
         {filteredBookings.length === 0 ? (
-          <DashboardDataState variant="empty" />
+          bookings.length === 0 ? (
+            <DashboardDataState variant="empty" />
+          ) : (
+            <section className="rounded-[28px] border border-[#e2dde8] bg-white p-8 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#6d7998]">Tidak Ada Hasil</p>
+              <h2 className="mt-3 font-[var(--font-fraunces)] text-[32px] font-medium leading-[1.05] text-[#121d35]">
+                Tidak ada booking yang cocok.
+              </h2>
+              <p className="mt-4 max-w-[560px] text-[15px] leading-[1.75] text-[#4f5b77]">
+                Coba longgarkan filter atau reset pencarian untuk melihat daftar booking yang lain.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button type="button" onClick={resetFilters} className="rounded-xl border border-[#c79a3c] bg-[#d2ac50] px-5 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#b8933d] hover:shadow-md">
+                  Reset Filter
+                </button>
+                <Link href="/dashboard/booking-baru" className="rounded-xl border border-[#d5dbea] bg-white px-5 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[#4f5b77] transition-colors duration-300 hover:bg-[#eef1f8] hover:text-[#25365f]">
+                  Buat Booking Baru
+                </Link>
+              </div>
+            </section>
+          )
         ) : (
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
             <section className="rounded-[28px] border border-[#e2dde8] bg-white shadow-sm">
@@ -282,6 +324,12 @@ export default function DashboardBookingPage() {
                       dengan sesi {selectedBooking.session}.
                     </p>
                     <div className="mt-6 space-y-4 border-t border-[#e5dfeb] pt-5">
+                      <div className="rounded-2xl border border-[#e8dec1] bg-[#fff8ed] px-4 py-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#ad7a2c]">Fokus Saat Ini</p>
+                        <p className="mt-2 text-[13px] leading-6 text-[#5d6780]">
+                          Buka detail jika Anda ingin melihat timeline lengkap, unggah dokumen terkait, atau cek tindak lanjut sesi ini.
+                        </p>
+                      </div>
                       {selectedBooking.timeline.map((item) => (
                         <div key={item.title} className="flex gap-3">
                           <span className={`mt-[7px] h-2.5 w-2.5 shrink-0 rounded-full ${item.status === "done" ? "bg-[#304878]" : item.status === "active" ? "bg-[#d2ac50]" : "bg-[#d5dbea]"}`} />

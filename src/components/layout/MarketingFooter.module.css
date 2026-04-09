@@ -74,6 +74,10 @@
   text-decoration: none;
 }
 
+.brandTextOnly {
+  gap: 0;
+}
+
 .footerBottom p {
   color: #ced6ed;
   font-size: 14px;

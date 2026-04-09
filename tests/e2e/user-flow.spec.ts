@@ -48,7 +48,7 @@ test("school and admin can complete the main lifecycle end-to-end", async ({ pag
 
   await login(page, "admin@example.com");
   await expect(page).toHaveURL(/\/dashboard-admin$/);
-  await expect(page.getByText("Selamat Datang, Admin")).toBeVisible();
+  await expect(page.getByText("Dashboard admin,")).toBeVisible();
 
   await page.goto("/dashboard-admin/booking");
   const bookingRow = page.locator("tr", { hasText: bookingId! });

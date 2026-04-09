@@ -14,13 +14,39 @@ export interface SignUpPayload {
   address: string;
 }
 
+function mapAuthErrorMessage(message?: string | null) {
+  const normalized = (message ?? "").toLowerCase();
+
+  if (normalized.includes("email not confirmed")) {
+    return "Akun belum aktif. Silakan tunggu verifikasi operator sekolah sebelum login.";
+  }
+
+  if (normalized.includes("invalid login credentials")) {
+    return "Email atau kata sandi tidak cocok.";
+  }
+
+  if (normalized.includes("user already registered")) {
+    return "Email ini sudah terdaftar. Silakan login atau hubungi operator sekolah.";
+  }
+
+  if (normalized.includes("signup is disabled")) {
+    return "Registrasi sedang dinonaktifkan sementara.";
+  }
+
+  if (normalized.includes("email rate limit exceeded")) {
+    return "Terlalu banyak permintaan email. Coba lagi beberapa saat.";
+  }
+
+  return message ?? "Terjadi kesalahan autentikasi.";
+}
+
 export async function signIn(email: string, password: string) {
   const supabase = createClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
-  if (error) return { user: null, error: error.message };
+  if (error) return { user: null, error: mapAuthErrorMessage(error.message) };
   return { user: data.user, error: null };
 }
 
@@ -40,8 +66,18 @@ export async function signUp(payload: SignUpPayload) {
       },
     },
   });
-  if (error) return { user: null, error: error.message };
+  if (error) return { user: null, error: mapAuthErrorMessage(error.message) };
   return { user: data.user, error: null };
+}
+
+export async function resendSignupVerification(email: string) {
+  const supabase = createClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+  });
+
+  return { error: error ? mapAuthErrorMessage(error.message) : null };
 }
 
 export async function signOut() {

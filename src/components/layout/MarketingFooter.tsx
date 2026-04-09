@@ -15,6 +15,7 @@ interface MarketingFooterProps {
   summary: string;
   textureSrc: string;
   contactItems: FooterContactItem[];
+  showLogo?: boolean;
 }
 
 export function MarketingFooter({
@@ -24,6 +25,7 @@ export function MarketingFooter({
   summary,
   textureSrc,
   contactItems,
+  showLogo = true,
 }: MarketingFooterProps) {
   return (
     <footer id={id} className={styles.footer}>
@@ -47,8 +49,10 @@ export function MarketingFooter({
         </div>
 
         <div className={styles.footerBottom}>
-          <Link className={styles.brand} href="/">
-            <Image src={logoSrc} alt={`${brandName} logo`} width={54} height={54} />
+          <Link className={`${styles.brand} ${!showLogo ? styles.brandTextOnly : ""}`} href="/">
+            {showLogo ? (
+              <Image src={logoSrc} alt={`${brandName} logo`} width={54} height={54} />
+            ) : null}
             <span>{brandName}</span>
           </Link>
           <p>{summary}</p>

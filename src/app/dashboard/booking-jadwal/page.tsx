@@ -185,13 +185,14 @@ export default function BookingJadwalPage() {
                   const inCurrentMonth = day.getMonth() === viewMonth.getMonth();
                   const iso = toISODate(day);
                   const dayEvents = eventsByDate[iso] ?? [];
+                  const hasBookings = dayEvents.length > 0;
                   const isSunday = day.getDay() === 0;
                   const hasFollowUp = followUpDates.has(iso);
                   const isLastInRow = (index + 1) % 7 === 0;
                   const isBottomRow = index >= 35;
 
                   return (
-                    <article key={iso} className={`group min-h-[120px] p-2.5 transition-colors ${!inCurrentMonth ? "bg-[#fcfbfe]" : isSunday ? "bg-[#faf8f8]" : ""} ${!isLastInRow ? "border-r border-[#eceaef]" : ""} ${!isBottomRow ? "border-b border-[#eceaef]" : ""} hover:bg-[#f5f3f7]`}>
+                    <article key={iso} className={`group min-h-[120px] p-2.5 transition-colors ${hasBookings ? "bg-[#fff3df]" : !inCurrentMonth ? "bg-[#fcfbfe]" : isSunday ? "bg-[#faf8f8]" : ""} ${!isLastInRow ? "border-r border-[#eceaef]" : ""} ${!isBottomRow ? "border-b border-[#eceaef]" : ""} hover:bg-[#fff0d1]`}>
                       <header className="mb-2 flex items-center justify-between">
                         <span className={`text-[13px] font-bold ${!inCurrentMonth ? "text-[#a3adc2]" : isSunday ? "text-[#c06060]" : "text-[#34466f]"}`}>{day.getDate()}</span>
                         <div className="flex items-center gap-1">

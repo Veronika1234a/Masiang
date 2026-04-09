@@ -1,17 +1,29 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useDashboard } from "@/lib/DashboardContext";
 import { Modal } from "@/components/ui/Modal";
-import { type DocumentReviewStatus, ALL_STAGES } from "@/lib/userDashboardData";
+import { useDashboard } from "@/lib/DashboardContext";
+import { ALL_STAGES, type DocumentReviewStatus, type SchoolDocument } from "@/lib/userDashboardData";
+import { getSignedUrl, isDirectDownloadPath } from "@/lib/supabase/services/storage";
 
-const ALL_REVIEW_STATUSES: DocumentReviewStatus[] = ["Menunggu Review", "Disetujui", "Perlu Revisi"];
+const ALL_REVIEW_STATUSES: DocumentReviewStatus[] = [
+  "Menunggu Review",
+  "Disetujui",
+  "Perlu Revisi",
+];
+const FILTER_PILL_CLASS_NAME =
+  "rounded-full border px-4 py-2.5 text-[12px] font-bold transition-colors";
+const INPUT_CLASS_NAME =
+  "min-h-12 w-full rounded-2xl border border-[#d5dceb] bg-white px-4 text-[14px] font-medium text-[#25365f] placeholder:text-[#8f9ab3] shadow-[0_8px_24px_-20px_rgba(37,54,95,0.35)] outline-none transition-[border-color,box-shadow] duration-200 focus:border-[#35557c] focus:shadow-[0_10px_28px_-18px_rgba(53,85,124,0.35)]";
 
 function getReviewClasses(status: string) {
   switch (status) {
-    case "Disetujui": return "bg-[#d1fae5] text-[#065f46]";
-    case "Perlu Revisi": return "bg-[#fef3c7] text-[#92400e]";
-    default: return "bg-[#dbeafe] text-[#1e40af]";
+    case "Disetujui":
+      return "bg-[#e8f3ee] text-[#2b5f52]";
+    case "Perlu Revisi":
+      return "bg-[#fff6e6] text-[#9b6a1d]";
+    default:
+      return "bg-[#eef4fb] text-[#35557c]";
   }
 }
 
@@ -28,32 +40,87 @@ export default function AdminDokumenPage() {
   const [filterReview, setFilterReview] = useState<string>("Semua");
   const [filterStage, setFilterStage] = useState<string>("Semua");
 
-  // Review modal
   const [reviewModalId, setReviewModalId] = useState<string | null>(null);
   const [reviewAction, setReviewAction] = useState<"Disetujui" | "Perlu Revisi">("Disetujui");
   const [reviewNotes, setReviewNotes] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownload = async (doc: SchoolDocument) => {
+    if (!doc.storagePath) return;
+
+    if (isDirectDownloadPath(doc.storagePath)) {
+      window.open(doc.storagePath, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    setDownloadingId(doc.id);
+    try {
+      const url = await getSignedUrl(doc.storagePath);
+      if (url) {
+        const a = window.document.createElement("a");
+        a.href = url;
+        a.download = doc.fileName;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        window.document.body.appendChild(a);
+        a.click();
+        window.document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error("handleDownload error:", error);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     let result = [...documents];
+
     if (filterReview !== "Semua") {
-      result = result.filter((d) => d.reviewStatus === filterReview);
+      result = result.filter((document) => document.reviewStatus === filterReview);
     }
+
     if (filterStage !== "Semua") {
-      result = result.filter((d) => d.stage === filterStage);
+      result = result.filter((document) => document.stage === filterStage);
     }
+
     return result;
   }, [documents, filterReview, filterStage]);
 
+  const summaryCards = [
+    {
+      label: "Menunggu Review",
+      value: documents.filter((document) => document.reviewStatus === "Menunggu Review").length,
+      accent: "text-[#35557c]",
+    },
+    {
+      label: "Perlu Revisi",
+      value: documents.filter((document) => document.reviewStatus === "Perlu Revisi").length,
+      accent: "text-[#9b6a1d]",
+    },
+    {
+      label: "Sudah Disetujui",
+      value: documents.filter((document) => document.reviewStatus === "Disetujui").length,
+      accent: "text-[#2f5a4b]",
+    },
+    {
+      label: "Tampil Saat Ini",
+      value: filtered.length,
+      accent: "text-[#25365f]",
+    },
+  ];
+
   const openReviewModal = (id: string, action: "Disetujui" | "Perlu Revisi") => {
-    const doc = documents.find((d) => d.id === id);
+    const document = documents.find((item) => item.id === id);
     setReviewModalId(id);
     setReviewAction(action);
-    setReviewNotes(action === "Perlu Revisi" ? (doc?.reviewerNotes ?? "") : "");
+    setReviewNotes(action === "Perlu Revisi" ? (document?.reviewerNotes ?? "") : "");
   };
 
   const handleReview = async () => {
     if (!reviewModalId) return;
+
     setIsSubmittingReview(true);
     try {
       await reviewDocument(reviewModalId, reviewAction, reviewNotes.trim() || undefined);
@@ -66,139 +133,198 @@ export default function AdminDokumenPage() {
     }
   };
 
-  const reviewModalDoc = reviewModalId ? documents.find((d) => d.id === reviewModalId) : null;
+  const reviewModalDoc = reviewModalId
+    ? documents.find((document) => document.id === reviewModalId)
+    : null;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6d7998]">Dashboard Admin &rsaquo; Review Dokumen</p>
-        <h2 className="mt-1 font-[family-name:var(--font-fraunces)] text-[22px] font-bold text-[#25365f]">
+    <div className="space-y-6 text-[#25365f]">
+      <header className="space-y-2">
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6d7998]">
+          Dashboard Admin &rsaquo; Review Dokumen
+        </p>
+        <h2 className="font-[family-name:var(--font-fraunces)] text-[24px] font-bold text-[#25365f]">
           Review Dokumen
         </h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-[#6d7998]">
-          Review dan setujui dokumen yang diunggah oleh sekolah.
+        <p className="max-w-[700px] text-[14px] leading-7 text-[#5d6780]">
+          Lihat dokumen yang perlu keputusan, identifikasi revisi yang menumpuk,
+          lalu beri respons tanpa harus membaca tabel yang terlalu padat.
         </p>
-      </div>
+      </header>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <div>
-          <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#6d7998]">Status Review</label>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setFilterReview("Semua")}
-              className={`rounded-full px-4 py-2 text-[11px] font-bold transition-colors ${filterReview === "Semua" ? "bg-[#25365f] text-white" : "bg-white border border-[#e1dce8] text-[#4f5b77] hover:bg-[#f5f3f7]"}`}
-            >
-              Semua
-            </button>
-            {ALL_REVIEW_STATUSES.map((s) => (
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {summaryCards.map((card) => (
+          <article
+            key={card.label}
+            className="rounded-[24px] border border-[#e2dde8] bg-white px-5 py-4 shadow-[0_18px_40px_-32px_rgba(37,54,95,0.4)]"
+          >
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7b879f]">
+              {card.label}
+            </p>
+            <p className={`mt-3 font-[var(--font-fraunces)] text-[34px] font-medium leading-none ${card.accent}`}>
+              {card.value}
+            </p>
+          </article>
+        ))}
+      </section>
+
+      <section className="rounded-[28px] border border-[#e2dde8] bg-[#f8f7fb] p-5 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7b879f]">
+              Status Review
+            </span>
+            <div className="flex flex-wrap gap-2">
               <button
-                key={s}
                 type="button"
-                onClick={() => setFilterReview(s)}
-                className={`rounded-full px-4 py-2 text-[11px] font-bold transition-colors ${filterReview === s ? "bg-[#25365f] text-white" : "bg-white border border-[#e1dce8] text-[#4f5b77] hover:bg-[#f5f3f7]"}`}
+                onClick={() => setFilterReview("Semua")}
+                className={`${FILTER_PILL_CLASS_NAME} ${
+                  filterReview === "Semua"
+                    ? "border-[#25365f] bg-[#25365f] text-white"
+                    : "border-[#d8deeb] bg-white text-[#4f5b77] hover:bg-[#eef2f8]"
+                }`}
               >
-                {s}
+                Semua
               </button>
-            ))}
+              {ALL_REVIEW_STATUSES.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setFilterReview(status)}
+                  className={`${FILTER_PILL_CLASS_NAME} ${
+                    filterReview === status
+                      ? "border-[#25365f] bg-[#25365f] text-white"
+                      : "border-[#d8deeb] bg-white text-[#4f5b77] hover:bg-[#eef2f8]"
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7b879f]">
+              Tahap Dokumen
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setFilterStage("Semua")}
+                className={`${FILTER_PILL_CLASS_NAME} ${
+                  filterStage === "Semua"
+                    ? "border-[#25365f] bg-[#25365f] text-white"
+                    : "border-[#d8deeb] bg-white text-[#4f5b77] hover:bg-[#eef2f8]"
+                }`}
+              >
+                Semua
+              </button>
+              {ALL_STAGES.map((stage) => (
+                <button
+                  key={stage}
+                  type="button"
+                  onClick={() => setFilterStage(stage)}
+                  className={`${FILTER_PILL_CLASS_NAME} ${
+                    filterStage === stage
+                      ? "border-[#25365f] bg-[#25365f] text-white"
+                      : "border-[#d8deeb] bg-white text-[#4f5b77] hover:bg-[#eef2f8]"
+                  }`}
+                >
+                  {stage}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-        <div>
-          <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#6d7998]">Tahap</label>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setFilterStage("Semua")}
-              className={`rounded-full px-4 py-2 text-[11px] font-bold transition-colors ${filterStage === "Semua" ? "bg-[#25365f] text-white" : "bg-white border border-[#e1dce8] text-[#4f5b77] hover:bg-[#f5f3f7]"}`}
-            >
-              Semua
-            </button>
-            {ALL_STAGES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setFilterStage(s)}
-                className={`rounded-full px-4 py-2 text-[11px] font-bold transition-colors ${filterStage === s ? "bg-[#25365f] text-white" : "bg-white border border-[#e1dce8] text-[#4f5b77] hover:bg-[#f5f3f7]"}`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      </section>
 
-      {/* Table */}
-      <div className="rounded-2xl border border-[#e1dce8] bg-white">
+      <section className="rounded-[28px] border border-[#e1dce8] bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full min-w-[940px] text-left text-[14px]">
             <thead>
-              <tr className="border-b border-[#e1dce8]">
-                <th className="px-5 py-3 font-bold text-[#6d7998]">ID</th>
-                <th className="px-5 py-3 font-bold text-[#6d7998]">Nama File</th>
-                <th className="px-5 py-3 font-bold text-[#6d7998]">Tahap</th>
-                <th className="px-5 py-3 font-bold text-[#6d7998]">Ukuran</th>
-                <th className="px-5 py-3 font-bold text-[#6d7998]">Upload</th>
-                <th className="px-5 py-3 font-bold text-[#6d7998]">Versi</th>
-                <th className="px-5 py-3 font-bold text-[#6d7998]">Status</th>
-                <th className="px-5 py-3 font-bold text-[#6d7998]">Aksi</th>
+              <tr className="border-b border-[#e8e2ec]">
+                <th className="px-5 py-3.5 font-bold text-[#6d7998]">ID</th>
+                <th className="px-5 py-3.5 font-bold text-[#6d7998]">Nama File</th>
+                <th className="px-5 py-3.5 font-bold text-[#6d7998]">Tahap</th>
+                <th className="px-5 py-3.5 font-bold text-[#6d7998]">Ukuran</th>
+                <th className="px-5 py-3.5 font-bold text-[#6d7998]">Upload</th>
+                <th className="px-5 py-3.5 font-bold text-[#6d7998]">Versi</th>
+                <th className="px-5 py-3.5 font-bold text-[#6d7998]">Status</th>
+                <th className="px-5 py-3.5 font-bold text-[#6d7998]">Aksi</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length > 0 ? filtered.map((d) => (
-                <tr key={d.id} className="border-b border-[#f3f1f5] last:border-0 hover:bg-[#faf9fc]">
-                  <td className="px-5 py-3 font-semibold text-[#4a6baf]">{d.id}</td>
-                  <td className="px-5 py-3 text-[#4f5b77] max-w-[220px]">
-                    <p className="truncate font-medium">{d.fileName}</p>
-                    {d.reviewerNotes && (
-                      <p className="mt-1 text-[11px] text-[#92400e] truncate">Catatan: {d.reviewerNotes}</p>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-[#6d7998]">{d.stage}</td>
-                  <td className="px-5 py-3 text-[#6d7998] text-[12px]">{formatFileSize(d.fileSize)}</td>
-                  <td className="px-5 py-3 text-[#6d7998] text-[12px] whitespace-nowrap">{d.uploadedAt}</td>
-                  <td className="px-5 py-3 text-[#6d7998] text-center">v{d.version ?? 1}</td>
-                  <td className="px-5 py-3">
-                    <span className={`inline-block rounded-full px-3 py-1 text-[11px] font-bold ${getReviewClasses(d.reviewStatus ?? "")}`}>
-                      {d.reviewStatus ?? "—"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <div className="flex gap-2">
-                      {d.reviewStatus !== "Disetujui" && (
-                        <button
-                          type="button"
-                          onClick={() => openReviewModal(d.id, "Disetujui")}
-                          className="rounded-lg bg-[#065f46] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#047857] transition-colors"
-                        >
-                          Setujui
-                        </button>
-                      )}
-                      {d.reviewStatus !== "Perlu Revisi" && (
-                        <button
-                          type="button"
-                          onClick={() => openReviewModal(d.id, "Perlu Revisi")}
-                          className="rounded-lg border border-[#fbbf24] bg-[#fffbeb] px-3 py-1.5 text-[11px] font-bold text-[#92400e] hover:bg-[#fef3c7] transition-colors"
-                        >
-                          Minta Revisi
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )) : (
+              {filtered.length > 0 ? (
+                filtered.map((document) => (
+                  <tr key={document.id} className="border-b border-[#f3f1f5] last:border-0 hover:bg-[#fcfbfd]">
+                    <td className="px-5 py-4 font-semibold text-[#35557c]">{document.id}</td>
+                    <td className="px-5 py-4 max-w-[260px] text-[#4f5b77]">
+                      <p className="truncate font-medium">{document.fileName}</p>
+                      {document.reviewerNotes ? (
+                        <p className="mt-1 text-[12px] leading-6 text-[#9b6a1d]">
+                          Catatan: {document.reviewerNotes}
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="px-5 py-4 text-[#6d7998]">{document.stage}</td>
+                    <td className="px-5 py-4 text-[13px] text-[#6d7998]">
+                      {formatFileSize(document.fileSize)}
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-[13px] text-[#6d7998]">
+                      {document.uploadedAt}
+                    </td>
+                    <td className="px-5 py-4 text-center text-[#6d7998]">v{document.version ?? 1}</td>
+                    <td className="px-5 py-4">
+                      <span className={`inline-block rounded-full px-3 py-1.5 text-[11px] font-bold ${getReviewClasses(document.reviewStatus ?? "")}`}>
+                        {document.reviewStatus ?? "-"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        {document.reviewStatus !== "Disetujui" ? (
+                          <button
+                            type="button"
+                            onClick={() => openReviewModal(document.id, "Disetujui")}
+                            className="rounded-xl bg-[#d2ac50] px-3.5 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[#b8933d]"
+                          >
+                            Setujui
+                          </button>
+                        ) : null}
+                        {document.reviewStatus !== "Perlu Revisi" ? (
+                          <button
+                            type="button"
+                            onClick={() => openReviewModal(document.id, "Perlu Revisi")}
+                            className="rounded-xl border border-[#ead7b0] bg-[#fff8ed] px-3.5 py-2 text-[12px] font-bold text-[#9b6a1d] transition-colors hover:bg-[#fff3e1]"
+                          >
+                            Minta Revisi
+                          </button>
+                        ) : null}
+                        {document.storagePath ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(document)}
+                            disabled={downloadingId === document.id}
+                            className="rounded-xl border border-[#cfd5e6] bg-white px-3.5 py-2 text-[12px] font-bold text-[#4f5b77] transition-colors hover:bg-[#eef1f8] disabled:opacity-50"
+                          >
+                            {downloadingId === document.id ? "Mengunduh..." : "Unduh"}
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center text-[13px] text-[#6d7998]">
-                    Tidak ada dokumen ditemukan.
+                  <td colSpan={8} className="px-5 py-14 text-center text-[14px] text-[#6d7998]">
+                    Tidak ada dokumen yang cocok dengan filter ini.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      {/* Review Modal */}
       <Modal
         open={reviewModalId !== null}
         onClose={() => setReviewModalId(null)}
@@ -208,7 +334,7 @@ export default function AdminDokumenPage() {
             <button
               type="button"
               onClick={() => setReviewModalId(null)}
-              className="rounded-xl border border-[#d8deeb] px-4 py-2 text-[13px] font-bold text-[#4f5b77] hover:bg-[#f5f3f7]"
+              className="rounded-xl border border-[#d8deeb] px-4 py-2.5 text-[13px] font-bold text-[#4f5b77] hover:bg-[#f5f3f7]"
             >
               Batal
             </button>
@@ -216,10 +342,10 @@ export default function AdminDokumenPage() {
               type="button"
               onClick={handleReview}
               disabled={isSubmittingReview || (reviewAction === "Perlu Revisi" && !reviewNotes.trim())}
-              className={`rounded-xl px-4 py-2 text-[13px] font-bold text-white transition-colors disabled:opacity-40 ${
+              className={`rounded-xl px-4 py-2.5 text-[13px] font-bold text-white transition-colors disabled:opacity-40 ${
                 reviewAction === "Disetujui"
-                  ? "bg-[#065f46] hover:bg-[#047857]"
-                  : "bg-[#92400e] hover:bg-[#a16207]"
+                  ? "bg-[#d2ac50] hover:bg-[#b8933d]"
+                  : "bg-[#b86b63] hover:bg-[#9f5a53]"
               }`}
             >
               {reviewAction === "Disetujui" ? "Konfirmasi Setujui" : "Konfirmasi Minta Revisi"}
@@ -227,27 +353,34 @@ export default function AdminDokumenPage() {
           </>
         }
       >
-        {reviewModalDoc && (
-          <div className="space-y-3">
-            <div className="rounded-xl bg-[#f5f3f7] p-3">
-              <p className="text-[12px] font-bold text-[#6d7998]">Dokumen</p>
-              <p className="text-[13px] font-medium text-[#25365f]">{reviewModalDoc.fileName}</p>
-              <p className="text-[12px] text-[#6d7998] mt-1">Tahap: {reviewModalDoc.stage} &bull; {reviewModalDoc.uploadedAt}</p>
+        {reviewModalDoc ? (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-[#ece6f1] bg-[#f8f7fb] p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7b879f]">Dokumen</p>
+              <p className="mt-2 text-[15px] font-semibold text-[#25365f]">{reviewModalDoc.fileName}</p>
+              <p className="mt-2 text-[13px] leading-6 text-[#6d7998]">
+                Tahap {reviewModalDoc.stage} • diunggah {reviewModalDoc.uploadedAt}
+              </p>
             </div>
-            <div>
-              <label className="mb-1 block text-[12px] font-bold text-[#6d7998]">
+
+            <label className="grid gap-2">
+              <span className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7b879f]">
                 Catatan {reviewAction === "Perlu Revisi" ? "(wajib)" : "(opsional)"}
-              </label>
+              </span>
               <textarea
                 value={reviewNotes}
-                onChange={(e) => setReviewNotes(e.target.value)}
-                placeholder={reviewAction === "Perlu Revisi" ? "Jelaskan bagian yang perlu direvisi..." : "Catatan tambahan (opsional)..."}
-                rows={3}
-                className="w-full rounded-xl border border-[#d8deeb] px-4 py-3 text-[13px] text-[#25365f] placeholder:text-[#a3adc2] focus:border-[#4a6baf] focus:outline-none"
+                onChange={(event) => setReviewNotes(event.target.value)}
+                placeholder={
+                  reviewAction === "Perlu Revisi"
+                    ? "Jelaskan bagian yang perlu direvisi..."
+                    : "Catatan tambahan (opsional)..."
+                }
+                rows={4}
+                className={`${INPUT_CLASS_NAME} min-h-[132px] px-4 py-3`}
               />
-            </div>
+            </label>
           </div>
-        )}
+        ) : null}
       </Modal>
     </div>
   );

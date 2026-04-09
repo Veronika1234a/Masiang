@@ -25,6 +25,10 @@
   border-radius: 8px;
 }
 
+.brandTextOnly {
+  gap: 0;
+}
+
 .desktopNav {
   display: flex;
   gap: 28px;

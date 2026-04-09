@@ -61,7 +61,6 @@ function LoginPageContent() {
     () => Object.keys(validate(values)).length === 0,
     [values],
   );
-
   const onChange = (field: LoginField) => (event: ChangeEvent<HTMLInputElement>) => {
     const nextValues = { ...values, [field]: event.target.value };
     setValues(nextValues);
@@ -261,9 +260,19 @@ function LoginPageContent() {
           ) : null}
 
           {status === "auth_error" ? (
-            <p className="mt-4 rounded-2xl border border-[#e4b8b8] bg-[#fff1f1] px-3.5 py-[13px] text-[13px] leading-6 text-[#8c2f2f]">
-              {authError}
-            </p>
+            <div className="mt-4 space-y-3">
+              <p className="rounded-2xl border border-[#e4b8b8] bg-[#fff1f1] px-3.5 py-[13px] text-[13px] leading-6 text-[#8c2f2f]">
+                {authError}
+              </p>
+              <div className="rounded-2xl border border-[#ddd5c8] bg-white/80 p-4">
+                <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#5b4b36]">
+                  Verifikasi Operator
+                </p>
+                <p className="mt-2.5 text-[13px] leading-7 text-[#4f5a70]">
+                  Jika akun sekolah belum bisa login, pastikan operator sekolah sudah mengaktifkan akun tersebut.
+                </p>
+              </div>
+            </div>
           ) : null}
 
           {status === "success" ? (
