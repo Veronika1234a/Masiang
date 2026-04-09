@@ -4,7 +4,11 @@ import { useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { useDashboard } from "@/lib/DashboardContext";
 import { ALL_STAGES, type DocumentReviewStatus, type SchoolDocument } from "@/lib/userDashboardData";
-import { getSignedUrl, isDirectDownloadPath } from "@/lib/supabase/services/storage";
+import {
+  getSeedDocumentDownloadUrl,
+  getSignedUrl,
+  isDirectDownloadPath,
+} from "@/lib/supabase/services/storage";
 
 const ALL_REVIEW_STATUSES: DocumentReviewStatus[] = [
   "Menunggu Review",
@@ -34,8 +38,20 @@ function formatFileSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getDocumentActionLabel(document: SchoolDocument): string {
+  if (document.mimeType === "text/uri-list") {
+    return "Buka Link";
+  }
+
+  if (document.storagePath && /^https?:\/\//i.test(document.storagePath)) {
+    return "Buka Link";
+  }
+
+  return "Unduh";
+}
+
 export default function AdminDokumenPage() {
-  const { documents, reviewDocument } = useDashboard();
+  const { documents, reviewDocument, addToast } = useDashboard();
 
   const [filterReview, setFilterReview] = useState<string>("Semua");
   const [filterStage, setFilterStage] = useState<string>("Semua");
@@ -47,28 +63,45 @@ export default function AdminDokumenPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const handleDownload = async (doc: SchoolDocument) => {
-    if (!doc.storagePath) return;
+    const seedDownloadUrl = getSeedDocumentDownloadUrl(doc.id, doc.storagePath);
+    if (!doc.storagePath && !seedDownloadUrl) {
+      addToast(`Dokumen "${doc.fileName}" belum memiliki file yang bisa dibuka.`, "info");
+      return;
+    }
 
-    if (isDirectDownloadPath(doc.storagePath)) {
+    if (doc.storagePath && isDirectDownloadPath(doc.storagePath)) {
       window.open(doc.storagePath, "_blank", "noopener,noreferrer");
       return;
     }
 
     setDownloadingId(doc.id);
     try {
-      const url = await getSignedUrl(doc.storagePath);
-      if (url) {
-        const a = window.document.createElement("a");
-        a.href = url;
-        a.download = doc.fileName;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        window.document.body.appendChild(a);
-        a.click();
-        window.document.body.removeChild(a);
+      const signedUrl = doc.storagePath
+        ? await getSignedUrl(doc.storagePath)
+        : null;
+      const downloadUrl = signedUrl ?? seedDownloadUrl;
+
+      if (!downloadUrl) {
+        addToast(`Gagal membuat tautan untuk "${doc.fileName}".`, "error");
+        return;
       }
+
+      if (doc.mimeType === "text/uri-list" || /^https?:\/\//i.test(downloadUrl)) {
+        window.open(downloadUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      const a = window.document.createElement("a");
+      a.href = downloadUrl;
+      a.download = doc.fileName;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
     } catch (error) {
       console.error("handleDownload error:", error);
+      addToast(`Gagal membuka dokumen "${doc.fileName}".`, "error");
     } finally {
       setDownloadingId(null);
     }
@@ -92,12 +125,12 @@ export default function AdminDokumenPage() {
     {
       label: "Menunggu Review",
       value: documents.filter((document) => document.reviewStatus === "Menunggu Review").length,
-      accent: "text-[#35557c]",
+      accent: "text-[#4b74b8]",
     },
     {
       label: "Perlu Revisi",
       value: documents.filter((document) => document.reviewStatus === "Perlu Revisi").length,
-      accent: "text-[#9b6a1d]",
+      accent: "text-[#cf6b12]",
     },
     {
       label: "Sudah Disetujui",
@@ -148,7 +181,9 @@ export default function AdminDokumenPage() {
         </h2>
         <p className="max-w-[700px] text-[14px] leading-7 text-[#5d6780]">
           Lihat dokumen yang perlu keputusan, identifikasi revisi yang menumpuk,
-          lalu beri respons tanpa harus membaca tabel yang terlalu padat.
+          lalu beri respons tanpa harus membaca tabel yang terlalu padat. Gunakan aksi
+          <span className="font-semibold text-[#35557c]"> Unduh</span> atau
+          <span className="font-semibold text-[#35557c]"> Buka Link</span> langsung dari tabel.
         </p>
       </header>
 
@@ -299,14 +334,14 @@ export default function AdminDokumenPage() {
                             Minta Revisi
                           </button>
                         ) : null}
-                        {document.storagePath ? (
+                        {document.storagePath || getSeedDocumentDownloadUrl(document.id, document.storagePath) ? (
                           <button
                             type="button"
                             onClick={() => handleDownload(document)}
                             disabled={downloadingId === document.id}
                             className="rounded-xl border border-[#cfd5e6] bg-white px-3.5 py-2 text-[12px] font-bold text-[#4f5b77] transition-colors hover:bg-[#eef1f8] disabled:opacity-50"
                           >
-                            {downloadingId === document.id ? "Mengunduh..." : "Unduh"}
+                            {downloadingId === document.id ? "Membuka..." : getDocumentActionLabel(document)}
                           </button>
                         ) : null}
                       </div>

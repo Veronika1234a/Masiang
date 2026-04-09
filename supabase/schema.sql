@@ -20,6 +20,7 @@ $$;
 create table if not exists public.profiles (
   id            uuid primary key references auth.users(id) on delete cascade,
   role          text not null default 'school' check (role in ('school', 'admin')),
+  approval_status text not null default 'pending' check (approval_status in ('pending', 'approved', 'rejected')),
   school_name   text,
   npsn          text unique,
   contact_name  text,
@@ -35,6 +36,13 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles add column if not exists avatar_path text;
+alter table public.profiles add column if not exists approval_status text not null default 'pending';
+update public.profiles
+set approval_status = case
+  when role = 'admin' then 'approved'
+  when approval_status is null then 'approved'
+  else approval_status
+end;
 
 alter table public.profiles enable row level security;
 
@@ -52,6 +60,15 @@ create policy "Users can update own profile"
   on public.profiles for update
   using (auth.uid() = id)
   with check (auth.uid() = id);
+
+create policy "Admin can update all profiles"
+  on public.profiles for update
+  using (
+    public.is_admin()
+  )
+  with check (
+    public.is_admin()
+  );
 
 create policy "Allow insert for own profile"
   on public.profiles for insert
@@ -299,11 +316,15 @@ security definer set search_path = ''
 as $$
 begin
   insert into public.profiles (
-    id, role, school_name, npsn, contact_name, email, phone, address, avatar_path
+    id, role, approval_status, school_name, npsn, contact_name, email, phone, address, avatar_path
   )
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'role', 'school'),
+    case
+      when coalesce(new.raw_user_meta_data ->> 'role', 'school') = 'admin' then 'approved'
+      else coalesce(new.raw_user_meta_data ->> 'approval_status', 'pending')
+    end,
     new.raw_user_meta_data ->> 'school_name',
     new.raw_user_meta_data ->> 'npsn',
     new.raw_user_meta_data ->> 'contact_name',

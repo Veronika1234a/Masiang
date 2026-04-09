@@ -46,11 +46,13 @@
 
 UPDATE public.profiles SET
   school_name = 'Admin MASIANG',
-  role = 'admin'
+  role = 'admin',
+  approval_status = 'approved'
 WHERE email = 'admin@masiang.id';
 
 UPDATE public.profiles SET
   school_name = 'UPT SDN 1 Mappak',
+  approval_status = 'approved',
   npsn = '10265538',
   contact_name = 'Andi Saputra',
   phone = '(0423) 123456',
@@ -252,17 +254,6 @@ VALUES
   (
     'NTF-002',
     (SELECT id FROM public.profiles WHERE email = 'sdn1mappak@gmail.com'),
-    'Dokumen Perlu Revisi',
-    'Dokumen ''Laporan Refleksi Program.pdf'' perlu direvisi. Lihat catatan pengawas.',
-    'doc_review',
-    'DOC-005',
-    'document',
-    false,
-    now() - INTERVAL '1 day'
-  ),
-  (
-    'NTF-003',
-    (SELECT id FROM public.profiles WHERE email = 'sdn1mappak@gmail.com'),
     'Tindak Lanjut Besok',
     'Tindak lanjut untuk RH-001 jatuh tempo besok. Pastikan semua item sudah diselesaikan.',
     'follow_up_reminder',
@@ -272,7 +263,7 @@ VALUES
     now() - INTERVAL '1 day'
   ),
   (
-    'NTF-004',
+    'NTF-003',
     (SELECT id FROM public.profiles WHERE email = 'sdn1mappak@gmail.com'),
     'Booking Ditolak',
     'Booking BK-005 (Pelatihan Penilaian Formatif) ditolak. Jadwal bentrok dengan kegiatan dinas.',
@@ -283,7 +274,7 @@ VALUES
     now() - INTERVAL '15 days'
   ),
   (
-    'NTF-005',
+    'NTF-004',
     (SELECT id FROM public.profiles WHERE email = 'sdn1mappak@gmail.com'),
     'Sesi Selesai',
     'Booking BK-004 (Evaluasi Program Literasi) telah selesai. Berikan rating dan feedback.',

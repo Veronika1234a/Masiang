@@ -3,6 +3,7 @@ import type { SchoolProfile } from "../../userDashboardData";
 import type { Database } from "../types";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+export type SchoolApprovalStatus = "pending" | "approved" | "rejected";
 
 export interface RegisteredSchoolProfile {
   id: string;
@@ -12,6 +13,7 @@ export interface RegisteredSchoolProfile {
   email: string;
   phone: string;
   address: string;
+  approvalStatus: SchoolApprovalStatus;
 }
 
 function rowToSchoolProfile(row: ProfileRow): SchoolProfile {
@@ -39,6 +41,7 @@ function rowToRegisteredSchool(row: ProfileRow): RegisteredSchoolProfile {
     email: row.email,
     phone: row.phone ?? "",
     address: row.address ?? "",
+    approvalStatus: (row.approval_status as SchoolApprovalStatus | null) ?? "pending",
   };
 }
 
@@ -108,4 +111,20 @@ export async function fetchAdminUserIds(): Promise<string[]> {
   return (data ?? [])
     .map((row) => row.id)
     .filter((id): id is string => typeof id === "string" && id.length > 0);
+}
+
+export async function updateSchoolApprovalStatus(
+  userId: string,
+  approvalStatus: SchoolApprovalStatus,
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ approval_status: approvalStatus })
+    .eq("id", userId)
+    .eq("role", "school");
+
+  if (error) {
+    throw error;
+  }
 }

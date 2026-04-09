@@ -26,11 +26,23 @@ function getStatusClasses(status: string) {
   }
 }
 
+function getApprovalStatusClasses(status: string) {
+  switch (status) {
+    case "approved":
+      return "bg-[#e8f3ee] text-[#2b5f52]";
+    case "rejected":
+      return "bg-[#fdf0ef] text-[#9b4b45]";
+    default:
+      return "bg-[#fff6e6] text-[#9b6a1d]";
+  }
+}
+
 interface SchoolInfo {
   id: string;
   name: string;
   email?: string;
   npsn?: string;
+  approvalStatus: string;
   totalBookings: number;
   pendingBookings: number;
   activeBookings: number;
@@ -40,9 +52,11 @@ interface SchoolInfo {
 }
 
 export default function AdminSekolahPage() {
-  const { registeredSchools } = useAuth();
+  const { registeredSchools, updateSchoolApprovalStatus } = useAuth();
   const { bookings, documents, histories } = useDashboard();
   const [detailSchool, setDetailSchool] = useState<string | null>(null);
+  const [approvalActionKey, setApprovalActionKey] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const schools = useMemo<SchoolInfo[]>(() => {
     const registeredById = new Map(registeredSchools.map((school) => [school.id, school]));
@@ -81,6 +95,7 @@ export default function AdminSekolahPage() {
         name: school.name,
         email: registered?.email,
         npsn: registered?.npsn,
+        approvalStatus: registered?.approvalStatus ?? "approved",
         totalBookings: schoolBookings.length,
         pendingBookings: schoolBookings.filter((booking) => booking.status === "Menunggu").length,
         activeBookings: schoolBookings.filter((booking) => booking.status === "Disetujui" || booking.status === "Dalam Proses").length,
@@ -137,10 +152,10 @@ export default function AdminSekolahPage() {
       description: "Akun sekolah dan entitas legacy yang terdeteksi.",
     },
     {
-      label: "Perlu Tindak Lanjut",
-      value: schools.filter((school) => school.pendingBookings > 0).length,
+      label: "Menunggu Verifikasi",
+      value: schools.filter((school) => school.approvalStatus === "pending").length,
       accent: "text-[#9b6a1d]",
-      description: "Sekolah yang masih punya booking menunggu.",
+      description: "Akun sekolah baru yang belum diaktifkan.",
     },
     {
       label: "Sedang Aktif",
@@ -155,6 +170,22 @@ export default function AdminSekolahPage() {
       description: "Dokumen yang sudah masuk ke sistem.",
     },
   ];
+
+  const runApprovalAction = async (schoolId: string, status: "approved" | "rejected") => {
+    setApprovalActionKey(`${schoolId}:${status}`);
+    setFeedback(null);
+    const result = await updateSchoolApprovalStatus(schoolId, status);
+    if (result.success) {
+      setFeedback(
+        status === "approved"
+          ? "Akun sekolah berhasil diaktifkan."
+          : "Akun sekolah ditandai ditolak.",
+      );
+    } else {
+      setFeedback(result.error ?? "Gagal memperbarui status akun sekolah.");
+    }
+    setApprovalActionKey(null);
+  };
 
   return (
     <div className="space-y-6 text-[#25365f]">
@@ -188,6 +219,12 @@ export default function AdminSekolahPage() {
         ))}
       </section>
 
+      {feedback ? (
+        <div className="rounded-2xl border border-[#d7deef] bg-white px-4 py-3 text-[13px] leading-6 text-[#40506e]">
+          {feedback}
+        </div>
+      ) : null}
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {schools.map((school) => (
           <article
@@ -196,9 +233,18 @@ export default function AdminSekolahPage() {
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#9aa6c4]">
-                  {school.npsn ? `NPSN ${school.npsn}` : "Profil Sekolah"}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#9aa6c4]">
+                    {school.npsn ? `NPSN ${school.npsn}` : "Profil Sekolah"}
+                  </p>
+                  <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${getApprovalStatusClasses(school.approvalStatus)}`}>
+                    {school.approvalStatus === "approved"
+                      ? "Aktif"
+                      : school.approvalStatus === "rejected"
+                        ? "Ditolak"
+                        : "Pending"}
+                  </span>
+                </div>
                 <h3 className="mt-3 font-[var(--font-fraunces)] text-[26px] font-medium leading-[1.08] text-[#121d35]">
                   {school.name}
                 </h3>
@@ -256,6 +302,31 @@ export default function AdminSekolahPage() {
               </div>
             </div>
 
+            {school.approvalStatus === "pending" ? (
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void runApprovalAction(school.id, "approved");
+                  }}
+                  disabled={approvalActionKey !== null}
+                  className="rounded-2xl border border-[#d08b17] bg-[#ff9409] py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#ea8608] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {approvalActionKey === `${school.id}:approved` ? "Memproses..." : "Setujui Akun"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void runApprovalAction(school.id, "rejected");
+                  }}
+                  disabled={approvalActionKey !== null}
+                  className="rounded-2xl border border-[#d9c5c3] bg-[#fff6f5] py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[#9b4b45] transition-colors hover:bg-[#fdeeed] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {approvalActionKey === `${school.id}:rejected` ? "Memproses..." : "Tolak Akun"}
+                </button>
+              </div>
+            ) : null}
+
             <button
               type="button"
               onClick={() => setDetailSchool(school.id)}
@@ -284,6 +355,18 @@ export default function AdminSekolahPage() {
               <section className="rounded-2xl border border-[#ece6f1] bg-[#f8f7fb] p-4">
                 <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#7b879f]">Info Akun</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <p className="text-[13px] leading-6 text-[#5d6780]">
+                    Status Akun
+                    <span className="mt-1 block">
+                      <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] ${getApprovalStatusClasses(detailSchoolData.registered.approvalStatus)}`}>
+                        {detailSchoolData.registered.approvalStatus === "approved"
+                          ? "Aktif"
+                          : detailSchoolData.registered.approvalStatus === "rejected"
+                            ? "Ditolak"
+                            : "Pending"}
+                      </span>
+                    </span>
+                  </p>
                   <p className="text-[13px] leading-6 text-[#5d6780]">
                     Email
                     <span className="mt-1 block font-semibold text-[#25365f]">{detailSchoolData.registered.email}</span>

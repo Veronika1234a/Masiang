@@ -43,6 +43,24 @@ test("school registration and admin flow stay functional end-to-end", async ({ p
   await page.getByLabel("Kata Sandi").fill(schoolPassword);
   await page.getByRole("button", { name: "Masuk" }).click();
 
+  await expect(page.getByText("Akun menunggu verifikasi operator sekolah.")).toBeVisible();
+
+  await login(page, "admin@example.com");
+  await expect(page).toHaveURL(/\/dashboard-admin$/);
+
+  await page.goto("/dashboard-admin/sekolah");
+  const schoolCard = page.locator("article", { hasText: schoolName });
+  await expect(schoolCard).toContainText("Pending");
+  await schoolCard.getByRole("button", { name: "Setujui Akun" }).click();
+  await expect(page.getByText("Akun sekolah berhasil diaktifkan.")).toBeVisible();
+  await expect(schoolCard).toContainText("Aktif");
+
+  await logout(page);
+
+  await page.goto("/login?redirectTo=%2Fdashboard%2Fbooking-baru");
+  await page.getByLabel("Email").fill(schoolEmail);
+  await page.getByLabel("Kata Sandi").fill(schoolPassword);
+  await page.getByRole("button", { name: "Masuk" }).click();
   await expect(page).toHaveURL(/\/dashboard\/booking-baru$/);
   await expect(page.getByLabel("Topik Pendampingan")).toBeVisible();
   await expect(page.getByLabel("Tanggal")).toBeVisible();
@@ -87,9 +105,46 @@ test("school registration and admin flow stay functional end-to-end", async ({ p
   await logout(page);
 
   await login(page, schoolEmail, schoolPassword);
+  await expect(page).toHaveURL(/\/dashboard\/ringkasan$/);
   await page.goto(`/dashboard/booking/${bookingId}`);
   await expect(page.getByText("DALAM PROSES", { exact: true })).toBeVisible();
   await expect(page.getByText("Pendampingan Program Kerja Tahunan")).toBeVisible();
+});
+
+test("rejected school account cannot log in until status changes", async ({ page, backend }) => {
+  backend.reset();
+
+  const schoolEmail = "smp.ditolak@example.com";
+  const schoolPassword = "password123";
+  const schoolName = "SMP Negeri Ditolak";
+
+  await page.goto("/daftar-sekolah");
+  await page.getByLabel("Nama Sekolah").fill(schoolName);
+  await page.getByLabel("NPSN").fill("88776655");
+  await page.getByLabel("Nama Penanggung Jawab").fill("Dina Operator");
+  await page.getByLabel("Email").fill(schoolEmail);
+  await page.getByLabel("No. Telepon").fill("081277788899");
+  await page.getByLabel("Alamat Sekolah").fill("Jl. Penolakan No. 7");
+  await page.getByLabel("Password", { exact: true }).fill(schoolPassword);
+  await page.getByLabel("Konfirmasi Password", { exact: true }).fill(schoolPassword);
+  await page.getByRole("button", { name: "Daftar Sekolah" }).click();
+  await expect(page.getByText("Registrasi berhasil!")).toBeVisible();
+
+  await login(page, "admin@example.com");
+  await expect(page).toHaveURL(/\/dashboard-admin$/);
+  await page.goto("/dashboard-admin/sekolah");
+  const schoolCard = page.locator("article", { hasText: schoolName });
+  await schoolCard.getByRole("button", { name: "Tolak Akun" }).click();
+  await expect(page.getByText("Akun sekolah ditandai ditolak.")).toBeVisible();
+  await expect(schoolCard).toContainText("Ditolak");
+
+  await logout(page);
+
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(schoolEmail);
+  await page.getByLabel("Kata Sandi").fill(schoolPassword);
+  await page.getByRole("button", { name: "Masuk" }).click();
+  await expect(page.getByText("Akun ditolak. Hubungi admin atau operator sekolah.")).toBeVisible();
 });
 
 test("admin login keeps route guard and main review actions working", async ({ page, backend }) => {

@@ -527,16 +527,6 @@ export function getNotificationSeed(): Notification[] {
     },
     {
       id: "NTF-002",
-      title: "Dokumen Perlu Revisi",
-      message: "Dokumen 'Laporan Refleksi Program.pdf' perlu direvisi. Lihat catatan pengawas.",
-      type: "doc_review",
-      referenceId: "DOC-005",
-      referenceType: "document",
-      isRead: false,
-      createdAt: withDayOffset(-1),
-    },
-    {
-      id: "NTF-003",
       title: "Tindak Lanjut Besok",
       message: "Tindak lanjut untuk RH-001 jatuh tempo besok. Pastikan semua item sudah diselesaikan.",
       type: "follow_up_reminder",
@@ -546,7 +536,7 @@ export function getNotificationSeed(): Notification[] {
       createdAt: withDayOffset(-1),
     },
     {
-      id: "NTF-004",
+      id: "NTF-003",
       title: "Booking Ditolak",
       message: "Booking BK-005 (Pelatihan Penilaian Formatif) ditolak. Jadwal bentrok dengan kegiatan dinas.",
       type: "booking_rejected",
@@ -556,7 +546,7 @@ export function getNotificationSeed(): Notification[] {
       createdAt: withDayOffset(-15),
     },
     {
-      id: "NTF-005",
+      id: "NTF-004",
       title: "Sesi Selesai",
       message: "Booking BK-004 (Evaluasi Program Literasi) telah selesai. Berikan rating dan feedback.",
       type: "booking_completed",

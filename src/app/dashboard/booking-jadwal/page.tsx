@@ -43,27 +43,27 @@ function getInitialMonth(bookings: BookingItem[]) {
 }
 
 function stageToneClass(tone: string) {
-  if (tone === "blue") return "bg-[#4f8fdb]";
-  if (tone === "gold") return "bg-[#d4a95c]";
-  if (tone === "cyan") return "bg-[#3f95a5]";
-  return "bg-[#ca9a3d]";
+  if (tone === "blue") return "bg-[#6b9de0]";
+  if (tone === "gold") return "bg-[#ff9409]";
+  if (tone === "cyan") return "bg-[#5f8fd9]";
+  return "bg-[#f2a53d]";
 }
 
 function dotColorClass(status: BookingStatus) {
-  if (status === "Disetujui") return "bg-[#2d7480]";
-  if (status === "Dalam Proses") return "bg-[#ad7a2c]";
+  if (status === "Disetujui") return "bg-[#5f8fd9]";
+  if (status === "Dalam Proses") return "bg-[#ff9409]";
   if (status === "Selesai") return "bg-[#205930]";
   if (status === "Ditolak" || status === "Dibatalkan") return "bg-[#a3adc2]";
-  return "bg-[#496b9f]";
+  return "bg-[#f2a53d]";
 }
 
 function badgeColorClass(status: BookingStatus) {
-  if (status === "Disetujui") return "bg-[#d8eef0] text-[#2d7480]";
-  if (status === "Dalam Proses") return "bg-[#fff2de] text-[#ad7a2c]";
+  if (status === "Disetujui") return "bg-[#eaf2ff] text-[#4f79bc]";
+  if (status === "Dalam Proses") return "bg-[#fff1de] text-[#d96f05]";
   if (status === "Selesai") return "bg-[#d9e7df] text-[#205930]";
   if (status === "Ditolak") return "bg-[#ffe9e9] text-[#812f2f]";
   if (status === "Dibatalkan") return "bg-[#f0eef2] text-[#6d7998]";
-  return "bg-[#dce7fb] text-[#496b9f]";
+  return "bg-[#fff1de] text-[#d96f05]";
 }
 
 const ALL_FILTERS: Array<BookingStatus | "Semua"> = ["Semua", "Disetujui", "Dalam Proses", "Menunggu", "Selesai", "Ditolak", "Dibatalkan"];
@@ -166,7 +166,7 @@ export default function BookingJadwalPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {ALL_FILTERS.map((val) => (
-                <button key={val} type="button" onClick={() => { setStatusFilter(val); setPanelOpen(false); }} className={`rounded-md border px-3.5 py-1.5 text-[13px] font-bold transition-all duration-200 ${statusFilter === val ? "border-[#b7c4df] bg-[#e9eef9] text-[#254d92] shadow-sm" : "border-[#cfd5e6] bg-white text-[#4f5b77] hover:bg-[#f3f2f8]"}`}>
+                <button key={val} type="button" onClick={() => { setStatusFilter(val); setPanelOpen(false); }} className={`rounded-md border px-3.5 py-1.5 text-[13px] font-bold transition-all duration-200 ${statusFilter === val ? "border-[#ffbf78] bg-[#fff1de] text-[#d96f05] shadow-sm" : "border-[#cfd5e6] bg-white text-[#4f5b77] hover:bg-[#f3f2f8]"}`}>
                   {val}
                 </button>
               ))}
@@ -192,12 +192,12 @@ export default function BookingJadwalPage() {
                   const isBottomRow = index >= 35;
 
                   return (
-                    <article key={iso} className={`group min-h-[120px] p-2.5 transition-colors ${hasBookings ? "bg-[#fff3df]" : !inCurrentMonth ? "bg-[#fcfbfe]" : isSunday ? "bg-[#faf8f8]" : ""} ${!isLastInRow ? "border-r border-[#eceaef]" : ""} ${!isBottomRow ? "border-b border-[#eceaef]" : ""} hover:bg-[#fff0d1]`}>
+                    <article key={iso} className={`group min-h-[120px] p-2.5 transition-colors ${hasBookings ? "bg-[#fff0df] shadow-[inset_0_0_0_1px_rgba(255,148,9,0.18)]" : !inCurrentMonth ? "bg-[#fcfbfe]" : isSunday ? "bg-[#faf8f8]" : ""} ${!isLastInRow ? "border-r border-[#eceaef]" : ""} ${!isBottomRow ? "border-b border-[#eceaef]" : ""} hover:bg-[#ffe7cb]`}>
                       <header className="mb-2 flex items-center justify-between">
                         <span className={`text-[13px] font-bold ${!inCurrentMonth ? "text-[#a3adc2]" : isSunday ? "text-[#c06060]" : "text-[#34466f]"}`}>{day.getDate()}</span>
                         <div className="flex items-center gap-1">
                           {hasFollowUp && <span className="h-1.5 w-1.5 rounded-full bg-[#c44444]" title="Tindak lanjut" />}
-                          {dayEvents.length > 0 && <span className="text-[10px] font-semibold text-[#8C847A] opacity-0 group-hover:opacity-100 transition-opacity">{dayEvents.length}</span>}
+                          {dayEvents.length > 0 && <span className="text-[10px] font-semibold text-[#d96f05] opacity-0 group-hover:opacity-100 transition-opacity">{dayEvents.length}</span>}
                         </div>
                       </header>
                       <div className="flex flex-col gap-1.5">
@@ -209,7 +209,7 @@ export default function BookingJadwalPage() {
                         {dayEvents.slice(0, 3).map((event) => {
                           const isSelected = selectedEvent?.id === event.id && panelOpen;
                           return (
-                            <button key={event.id} type="button" onClick={(e) => openEventPanel(event, e)} className={`flex w-full flex-col gap-0.5 rounded border px-2 py-1.5 text-left transition-all duration-200 ${isSelected ? "bg-white border-[#34466f] shadow-[0_2px_8px_rgba(20,30,50,0.1)]" : "bg-white border-[#e1dce8] hover:border-[#c2cbe0]"}`}>
+                            <button key={event.id} type="button" onClick={(e) => openEventPanel(event, e)} className={`flex w-full flex-col gap-0.5 rounded border px-2 py-1.5 text-left transition-all duration-200 ${isSelected ? "bg-white border-[#ff9409] shadow-[0_8px_18px_rgba(255,148,9,0.18)]" : "bg-white border-[#f0c892] hover:border-[#ffbf78]"}`}>
                               <div className="flex items-center gap-1.5">
                                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColorClass(event.status)}`} />
                                 <span className="truncate text-[11px] font-bold text-[#313f61]">{event.session}</span>
@@ -248,7 +248,7 @@ export default function BookingJadwalPage() {
                   <div className="mt-1"><span className={`inline-flex rounded-md px-3 py-1.5 text-[11px] font-bold ${badgeColorClass(visibleSelectedEvent.status)}`}>{visibleSelectedEvent.status}</span></div>
                 </div>
                 <div className="flex gap-2">
-                  <Link href={`/dashboard/booking/${visibleSelectedEvent.id}`} className="flex-1 rounded-lg bg-[#d2ac50] px-4 py-2 text-center text-[13px] font-bold text-white hover:bg-[#b8933d]">Detail Penuh</Link>
+                  <Link href={`/dashboard/booking/${visibleSelectedEvent.id}`} className="flex-1 rounded-lg bg-[#ff9409] px-4 py-2 text-center text-[13px] font-bold text-white hover:bg-[#ea8608]">Detail Penuh</Link>
                   <button type="button" onClick={() => setPanelOpen(false)} className="flex-1 rounded-lg border border-[#cfd5e6] bg-[#f9f8fc] px-4 py-2 text-center text-[13px] font-bold text-[#4f5b77] hover:bg-[#eef1f8]">Tutup</button>
                 </div>
               </>
@@ -276,7 +276,7 @@ export default function BookingJadwalPage() {
                   </div>
                   <div className="mt-1"><span className={`inline-flex rounded-md px-3 py-1.5 text-[11px] font-bold ${badgeColorClass(visibleSelectedEvent.status)}`}>{visibleSelectedEvent.status}</span></div>
                 </div>
-                <Link href={`/dashboard/booking/${visibleSelectedEvent.id}`} className="block w-full rounded-lg bg-[#d2ac50] px-4 py-2.5 text-center text-[13px] font-bold text-white hover:bg-[#b8933d]">Lihat Detail Penuh</Link>
+                <Link href={`/dashboard/booking/${visibleSelectedEvent.id}`} className="block w-full rounded-lg bg-[#ff9409] px-4 py-2.5 text-center text-[13px] font-bold text-white hover:bg-[#ea8608]">Lihat Detail Penuh</Link>
               </>
             )}
           </div>

@@ -63,15 +63,18 @@ export async function updateSession(request: NextRequest) {
   }
 
   let role: string | null = null;
+  let approvalStatus: string | null = null;
   try {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, approval_status")
       .eq("id", user.id)
       .single();
     role = profile?.role ?? null;
+    approvalStatus = profile?.approval_status ?? null;
   } catch {
     role = null;
+    approvalStatus = null;
   }
 
   if (!role) {
@@ -89,6 +92,16 @@ export async function updateSession(request: NextRequest) {
     redirectUrl.pathname = role === "school" ? "/dashboard/ringkasan" : "/login";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
+  }
+
+  if (isSchoolDashboard && role === "school" && approvalStatus !== "approved") {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set(
+      "redirectTo",
+      buildProtectedRedirectTarget(pathname, request.nextUrl.search),
+    );
+    return NextResponse.redirect(loginUrl);
   }
 
   if (isSchoolDashboard && role !== "school") {

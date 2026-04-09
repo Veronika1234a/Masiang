@@ -1,6 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "../client";
 import type { Database } from "../types";
+import type { SchoolApprovalStatus } from "./profiles";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -18,7 +19,7 @@ function mapAuthErrorMessage(message?: string | null) {
   const normalized = (message ?? "").toLowerCase();
 
   if (normalized.includes("email not confirmed")) {
-    return "Akun belum aktif. Silakan tunggu verifikasi operator sekolah sebelum login.";
+    return "Akun belum bisa digunakan. Pastikan verifikasi email dinonaktifkan dan tunggu persetujuan operator sekolah.";
   }
 
   if (normalized.includes("invalid login credentials")) {
@@ -40,17 +41,92 @@ function mapAuthErrorMessage(message?: string | null) {
   return message ?? "Terjadi kesalahan autentikasi.";
 }
 
+function getApprovalStatus(profile: Profile | null): SchoolApprovalStatus {
+  return (profile?.approval_status as SchoolApprovalStatus | null) ?? "pending";
+}
+
+async function fetchProfileRecord(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as Profile;
+}
+
 export async function signIn(email: string, password: string) {
   const supabase = createClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
-  if (error) return { user: null, error: mapAuthErrorMessage(error.message) };
-  return { user: data.user, error: null };
+  if (error) return { user: null, profile: null, error: mapAuthErrorMessage(error.message) };
+  if (!data.user) return { user: null, profile: null, error: "Terjadi kesalahan autentikasi." };
+
+  const profile = await fetchProfileRecord(supabase, data.user.id);
+  if (!profile) {
+    await supabase.auth.signOut();
+    return {
+      user: null,
+      profile: null,
+      error: "Akun belum siap dipakai. Hubungi operator sekolah.",
+    };
+  }
+
+  if (profile.role === "school") {
+    const approvalStatus = getApprovalStatus(profile);
+
+    if (approvalStatus === "pending") {
+      await supabase.auth.signOut();
+      return {
+        user: null,
+        profile: null,
+        error: "Akun menunggu verifikasi operator sekolah.",
+      };
+    }
+
+    if (approvalStatus === "rejected") {
+      await supabase.auth.signOut();
+      return {
+        user: null,
+        profile: null,
+        error: "Akun ditolak. Hubungi admin atau operator sekolah.",
+      };
+    }
+  }
+
+  return { user: data.user, profile, error: null };
 }
 
 export async function signUp(payload: SignUpPayload) {
+  if (process.env.NEXT_PUBLIC_E2E_TEST_MODE !== "1") {
+    const response = await fetch("/api/register-school", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const body = (await response.json().catch(() => null)) as
+      | { error?: string }
+      | null;
+
+    if (!response.ok) {
+      return { user: null, error: mapAuthErrorMessage(body?.error) };
+    }
+
+    return { user: null, error: null };
+  }
+
   const supabase = createClient();
   const { data, error } = await supabase.auth.signUp({
     email: payload.email,
@@ -141,13 +217,7 @@ export async function getSession() {
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .single();
-  if (error || !data) return null;
-  return data as Profile;
+  return fetchProfileRecord(supabase, userId);
 }
 
 export function onAuthStateChange(

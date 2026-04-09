@@ -7,6 +7,7 @@ interface MockAccount {
   email: string;
   password: string;
   role: Role;
+  approval_status: "pending" | "approved" | "rejected";
   school_name: string | null;
   npsn: string | null;
   contact_name: string | null;
@@ -119,6 +120,7 @@ function nowIso() {
 
 function createAccount(overrides: Partial<MockAccount> & Pick<MockAccount, "id" | "email" | "password" | "role">): MockAccount {
   return {
+    approval_status: "approved",
     school_name: null,
     npsn: null,
     contact_name: null,
@@ -244,6 +246,7 @@ function toAuthUser(account: MockAccount) {
     },
     user_metadata: {
       role: account.role,
+      approval_status: account.approval_status,
       school_name: account.school_name,
       contact_name: account.contact_name,
       npsn: account.npsn,
@@ -261,6 +264,7 @@ function toProfileRow(account: MockAccount) {
   return {
     id: account.id,
     role: account.role,
+    approval_status: account.approval_status,
     school_name: account.school_name,
     npsn: account.npsn,
     contact_name: account.contact_name,
@@ -506,6 +510,7 @@ export class MockSupabaseBackend {
         email: body?.email ?? "",
         password: body?.password ?? "",
         role: "school",
+        approval_status: "pending",
         school_name: body?.data?.school_name ?? "Sekolah Baru",
         npsn: body?.data?.npsn ?? "",
         contact_name: body?.data?.contact_name ?? "",
@@ -677,6 +682,9 @@ export class MockSupabaseBackend {
       if ("district" in updates) account.district = String(updates.district ?? "");
       if ("avatar_path" in updates) {
         account.avatar_path = updates.avatar_path ? String(updates.avatar_path) : null;
+      }
+      if ("approval_status" in updates) {
+        account.approval_status = (updates.approval_status as MockAccount["approval_status"]) ?? "pending";
       }
 
       await json(route, 200, []);

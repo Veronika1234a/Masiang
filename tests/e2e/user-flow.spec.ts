@@ -372,24 +372,46 @@ test("school can change password, upload avatar, print reports, and download doc
   await expect(page.getByText('Dokumen "Berita Acara Pendampingan.pdf" belum memiliki file yang bisa diunduh.')).toHaveCount(0);
 });
 
-test("school can register and log in with redirect target preserved", async ({ page, backend }) => {
+test("school registration waits for admin approval before login succeeds", async ({ page, backend }) => {
   backend.reset();
 
+  const schoolEmail = "newschool@example.com";
+  const schoolPassword = "password123";
+  const schoolName = "SMP Negeri Test";
+
   await page.goto("/daftar-sekolah");
-  await page.getByLabel("Nama Sekolah").fill("SMP Negeri Test");
+  await page.getByLabel("Nama Sekolah").fill(schoolName);
   await page.getByLabel("NPSN").fill("87654321");
   await page.getByLabel("Nama Penanggung Jawab").fill("Budi");
-  await page.getByLabel("Email").fill("newschool@example.com");
+  await page.getByLabel("Email").fill(schoolEmail);
   await page.getByLabel("No. Telepon").fill("081212121212");
   await page.getByLabel("Alamat Sekolah").fill("Jl. Test No. 2");
-  await page.getByLabel("Password", { exact: true }).fill("password123");
-  await page.getByLabel("Konfirmasi Password", { exact: true }).fill("password123");
+  await page.getByLabel("Password", { exact: true }).fill(schoolPassword);
+  await page.getByLabel("Konfirmasi Password", { exact: true }).fill(schoolPassword);
   await page.getByRole("button", { name: "Daftar Sekolah" }).click();
   await expect(page.getByText("Registrasi berhasil!")).toBeVisible();
+  expect(backend.state.accounts.find((account) => account.email === schoolEmail)?.approval_status).toBe("pending");
 
   await page.goto("/login?redirectTo=%2Fdashboard%2Fbooking-baru%3Fdate%3D2026-03-24");
-  await page.getByLabel("Email").fill("newschool@example.com");
-  await page.getByLabel("Kata Sandi").fill("password123");
+  await page.getByLabel("Email").fill(schoolEmail);
+  await page.getByLabel("Kata Sandi").fill(schoolPassword);
+  await page.getByRole("button", { name: "Masuk" }).click();
+  await expect(page.getByText("Akun menunggu verifikasi operator sekolah.")).toBeVisible();
+
+  await login(page, "admin@example.com");
+  await expect(page).toHaveURL(/\/dashboard-admin$/);
+  await page.goto("/dashboard-admin/sekolah");
+  const schoolCard = page.locator("article", { hasText: schoolName });
+  await expect(schoolCard).toContainText("Pending");
+  await schoolCard.getByRole("button", { name: "Setujui Akun" }).click();
+  await expect(page.getByText("Akun sekolah berhasil diaktifkan.")).toBeVisible();
+  await expect(schoolCard).toContainText("Aktif");
+
+  await logout(page);
+
+  await page.goto("/login?redirectTo=%2Fdashboard%2Fbooking-baru%3Fdate%3D2026-03-24");
+  await page.getByLabel("Email").fill(schoolEmail);
+  await page.getByLabel("Kata Sandi").fill(schoolPassword);
   await page.getByRole("button", { name: "Masuk" }).click();
   await expect(page).toHaveURL(/\/dashboard\/booking-baru\?date=2026-03-24$/);
   await expect(page.getByLabel("Tanggal")).toHaveValue("2026-03-24");

@@ -50,6 +50,22 @@ function formatFileSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getDocumentKind(doc: SchoolDocument): string {
+  if (doc.mimeType === "text/uri-list" || /^https?:\/\//i.test(doc.storagePath ?? "")) {
+    return "Link";
+  }
+
+  if ((doc.mimeType ?? "").startsWith("image/")) {
+    return "Foto";
+  }
+
+  if ((doc.mimeType ?? "").startsWith("video/")) {
+    return "Video";
+  }
+
+  return "Dokumen";
+}
+
 function isAllowedFile(file: File): boolean {
   return ALLOWED_TYPES.includes(file.type) || FILE_EXTENSION_REGEX.test(file.name);
 }
@@ -186,7 +202,10 @@ export default function DashboardDokumenPage() {
         <header className="max-w-3xl">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#6d7998]">Arsip Sekolah</p>
           <h1 className="mt-4 font-[var(--font-fraunces)] text-[clamp(30px,3vw,46px)] font-medium leading-[1.04] tracking-[-0.03em] text-[#121d35]">Dokumen yang tersusun rapi.</h1>
-          <p className="mt-4 text-[15px] leading-[1.8] text-[#4f5b77]">Kelola berkas pendampingan berdasarkan tahap kerja.</p>
+          <p className="mt-4 text-[15px] leading-[1.8] text-[#4f5b77]">
+            Kelola berkas pendampingan berdasarkan tahap kerja, termasuk dokumen, foto, video,
+            dan tautan kerja sekolah.
+          </p>
         </header>
 
         <section className="grid gap-4 md:grid-cols-[1.3fr_1fr]">
@@ -214,7 +233,7 @@ export default function DashboardDokumenPage() {
                       setUploadStage(tab);
                     }
                   }}
-                  className={`rounded-xl border px-4 py-2.5 text-[12px] font-bold uppercase tracking-[0.08em] transition-colors ${activeStage === tab ? "border-[#d5bb82] bg-[#fff2de] text-[#ad7a2c]" : "border-[#d8deeb] bg-white text-[#4f5b77] hover:bg-[#eef1f8]"}`}
+                  className={`rounded-xl border px-4 py-2.5 text-[12px] font-bold uppercase tracking-[0.08em] transition-colors ${activeStage === tab ? "border-[#ffbf78] bg-[#fff1de] text-[#d96f05]" : "border-[#d8deeb] bg-white text-[#4f5b77] hover:bg-[#eef1f8]"}`}
                 >
                   {tab}
                 </button>
@@ -237,7 +256,7 @@ export default function DashboardDokumenPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <input ref={inputRef} type="file" multiple accept=".pdf,.docx,.xlsx,.zip,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov" onChange={onUpload} className="hidden" />
-                <button type="button" onClick={() => inputRef.current?.click()} disabled={isUploading} className="rounded-xl border border-[#c79a3c] bg-[#d2ac50] px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white hover:-translate-y-0.5 hover:bg-[#b8933d] hover:shadow-md transition-all disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="button" onClick={() => inputRef.current?.click()} disabled={isUploading} className="rounded-xl border border-[#ea8a12] bg-[#ff9409] px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white hover:-translate-y-0.5 hover:bg-[#ea8608] hover:shadow-md transition-all disabled:cursor-not-allowed disabled:opacity-60">
                   {isUploading ? "Mengunggah..." : "Upload Dokumen"}
                 </button>
                 <button type="button" onClick={() => setShowChecklist(true)} className="rounded-xl border border-[#cfd5e6] bg-white px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[#4f5b77] hover:bg-[#eef1f8]">Checklist</button>
@@ -267,7 +286,7 @@ export default function DashboardDokumenPage() {
                   type="button"
                   onClick={() => void handleLinkUpload()}
                   disabled={isLinkUploading}
-                  className="rounded-xl border border-[#7b879f] bg-[#4f5b77] px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white hover:bg-[#3f4a63] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl border border-[#4f79bc] bg-[#5f8fd9] px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white hover:bg-[#4f80ca] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isLinkUploading ? "Menyimpan..." : "Tambah Link"}
                 </button>
@@ -275,6 +294,9 @@ export default function DashboardDokumenPage() {
             </div>
             <p className="text-[12px] text-[#6d7998]">
               Upload baru akan masuk ke tahap <span className="font-bold text-[#25365f]">{uploadStage}</span>. Filter daftar di atas tidak memblok upload.
+            </p>
+            <p className="text-[12px] text-[#6d7998]">
+              Format yang didukung: PDF, DOCX, XLSX, ZIP, JPG, PNG, GIF, WEBP, MP4, WEBM, MOV, dan link `http/https`.
             </p>
           </div>
         </section>
@@ -296,6 +318,7 @@ export default function DashboardDokumenPage() {
                     <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9aa6c4]">{doc.id}</span>
                     <span className={`inline-flex rounded-md px-2.5 py-1 text-[10px] font-bold uppercase ${getStageClasses(doc.stage)}`}>{doc.stage}</span>
                     {doc.reviewStatus && <span className={`inline-flex rounded-md px-2.5 py-1 text-[10px] font-bold uppercase ${getReviewClasses(doc.reviewStatus)}`}>{doc.reviewStatus}</span>}
+                    <span className="inline-flex rounded-md bg-[#eef4ff] px-2.5 py-1 text-[10px] font-bold uppercase text-[#4b74b8]">{getDocumentKind(doc)}</span>
                     {doc.version && doc.version > 1 && <span className="text-[10px] font-bold text-[#6d7998]">v{doc.version}</span>}
                   </div>
                   <h3 className="mt-3 truncate font-[var(--font-fraunces)] text-[24px] font-medium leading-[1.1] text-[#121d35]">{doc.fileName}</h3>
@@ -316,7 +339,7 @@ export default function DashboardDokumenPage() {
                   {doc.reviewStatus === "Perlu Revisi" && (
                     <>
                       <input ref={reviseRef} type="file" accept=".pdf,.docx,.xlsx,.zip,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov" onChange={onRevise} className="hidden" />
-                      <button type="button" onClick={() => { setReviseTarget(doc); reviseRef.current?.click(); }} className="rounded-xl border border-[#c79a3c] bg-[#d2ac50] px-4 py-3 text-[11px] font-bold uppercase text-white hover:bg-[#b8933d]">Upload Revisi</button>
+                      <button type="button" onClick={() => { setReviseTarget(doc); reviseRef.current?.click(); }} className="rounded-xl border border-[#ea8a12] bg-[#ff9409] px-4 py-3 text-[11px] font-bold uppercase text-white hover:bg-[#ea8608]">Upload Revisi</button>
                     </>
                   )}
                   <button type="button" onClick={() => setDeleteTarget(doc)} className="rounded-xl border border-[#e8c4c4] bg-[#fff5f5] px-4 py-3 text-[11px] font-bold uppercase text-[#a13636] hover:bg-[#ffe9e9]">Hapus</button>
@@ -325,7 +348,7 @@ export default function DashboardDokumenPage() {
             )) : (
               <div className="px-6 py-10 text-center">
                 <p className="text-[14px] text-[#6d7998] mb-4">Tidak ada dokumen yang cocok dengan filter.</p>
-                <button type="button" onClick={() => inputRef.current?.click()} disabled={isUploading} className="rounded-xl bg-[#d2ac50] px-6 py-3 text-[12px] font-bold uppercase text-white hover:bg-[#b8933d] disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="button" onClick={() => inputRef.current?.click()} disabled={isUploading} className="rounded-xl bg-[#ff9409] px-6 py-3 text-[12px] font-bold uppercase text-white hover:bg-[#ea8608] disabled:cursor-not-allowed disabled:opacity-60">
                   {isUploading ? "Mengunggah..." : "Upload Dokumen Pertama"}
                 </button>
               </div>

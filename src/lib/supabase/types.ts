@@ -13,6 +13,7 @@ export interface Database {
         Row: {
           id: string;
           role: string;
+          approval_status: string;
           school_name: string | null;
           npsn: string | null;
           contact_name: string | null;
@@ -29,6 +30,7 @@ export interface Database {
         Insert: {
           id: string;
           role?: string;
+          approval_status?: string;
           school_name?: string | null;
           npsn?: string | null;
           contact_name?: string | null;
@@ -45,6 +47,7 @@ export interface Database {
         Update: {
           id?: string;
           role?: string;
+          approval_status?: string;
           school_name?: string | null;
           npsn?: string | null;
           contact_name?: string | null;

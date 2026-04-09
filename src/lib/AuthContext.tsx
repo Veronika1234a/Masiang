@@ -24,6 +24,8 @@ import {
 import {
   fetchAllSchoolProfiles,
   type RegisteredSchoolProfile,
+  updateSchoolApprovalStatus as updateSchoolApprovalStatusInProfiles,
+  type SchoolApprovalStatus,
 } from "./supabase/services/profiles";
 import { createClient } from "./supabase/client";
 
@@ -35,6 +37,7 @@ export interface AuthUser {
   name: string;
   role: UserRole;
   avatarPath?: string;
+  approvalStatus?: SchoolApprovalStatus;
 }
 
 export interface RegisterInput {
@@ -49,10 +52,12 @@ export interface RegisterInput {
 
 export interface RegisteredSchool extends RegisterInput {
   id: string;
+  approvalStatus: SchoolApprovalStatus;
 }
 
 interface ProfileSnapshot {
   role?: string | null;
+  approval_status?: string | null;
   school_name?: string | null;
   contact_name?: string | null;
   email?: string | null;
@@ -69,6 +74,10 @@ interface AuthContextValue {
   resendSignupVerification(email: string): Promise<{ success: boolean; error?: string }>;
   changePassword(currentPassword: string, nextPassword: string): Promise<{ success: boolean; error?: string }>;
   updateAvatarPath(nextPath: string): Promise<{ success: boolean; error?: string }>;
+  updateSchoolApprovalStatus(
+    schoolId: string,
+    status: SchoolApprovalStatus,
+  ): Promise<{ success: boolean; error?: string }>;
   logout(): Promise<void>;
   refreshSchools(): Promise<void>;
 }
@@ -153,6 +162,10 @@ function buildAuthUser(
     name,
     role,
     avatarPath: profile?.avatar_path ?? metadata?.avatar_path,
+    approvalStatus:
+      role === "admin"
+        ? "approved"
+        : ((profile?.approval_status as SchoolApprovalStatus | null) ?? "pending"),
   };
 }
 
@@ -193,6 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             phone: s.phone,
             address: s.address,
             password: "",
+            approvalStatus: s.approvalStatus,
           }),
         ),
       );
@@ -204,7 +218,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const syncUserProfile = useCallback(
     async (nextUser: User) => {
       const profile = await getProfile(nextUser.id);
+      if (!profile) {
+        await supaSignOut().catch(() => null);
+        setUser(null);
+        setRegisteredSchools([]);
+        writeE2EUser(null);
+        return null;
+      }
+
       const resolvedUser = buildAuthUser(nextUser, profile);
+
+      if (resolvedUser.role === "school" && resolvedUser.approvalStatus !== "approved") {
+        await supaSignOut().catch(() => null);
+        setUser(null);
+        setRegisteredSchools([]);
+        writeE2EUser(null);
+        return null;
+      }
+
       setUser(resolvedUser);
       writeE2EUser(resolvedUser);
 
@@ -228,15 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const optimisticUser = buildAuthUser(session.user);
-        setUser(optimisticUser);
-        setLoading(false);
-        void syncUserProfile(session.user).catch(() => {
-          if (optimisticUser.role === "admin") {
-            void refreshSchools();
-          }
-        });
-        return;
+        await syncUserProfile(session.user).catch(() => null);
       }
       setLoading(false);
     });
@@ -252,18 +275,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
-        const optimisticUser = buildAuthUser(session.user);
-        setUser(optimisticUser);
-        void syncUserProfile(session.user).catch(() => {
-          if (optimisticUser.role === "admin") {
-            void refreshSchools();
-          }
-        });
+        await syncUserProfile(session.user).catch(() => null);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [refreshSchools, syncUserProfile]);
+
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (authUser?.role === "admin") {
+      const refreshTimer = window.setTimeout(() => {
+        void refreshSchools();
+      }, 0);
+
+      return () => window.clearTimeout(refreshTimer);
+    }
+
+    const clearTimer = window.setTimeout(() => {
+      setRegisteredSchools([]);
+    }, 0);
+
+    return () => window.clearTimeout(clearTimer);
+  }, [authLoading, authUser?.id, authUser?.role, refreshSchools]);
 
   const login = useCallback(
     async (
@@ -275,25 +312,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: result.error, redirectTo: "" };
       }
 
-      if (result.user) {
-        const optimisticUser = buildAuthUser(result.user);
-        setUser(optimisticUser);
-        writeE2EUser(optimisticUser);
-        if (optimisticUser.role !== "admin") {
+      if (result.user && result.profile) {
+        const resolvedUser = buildAuthUser(result.user, result.profile);
+        setUser(resolvedUser);
+        writeE2EUser(resolvedUser);
+        if (resolvedUser.role !== "admin") {
           setRegisteredSchools([]);
+        } else {
+          await refreshSchools();
         }
-        void syncUserProfile(result.user).catch(() => {
-          if (optimisticUser.role === "admin") {
-            void refreshSchools();
-          }
-        });
-        const redirectTo = optimisticUser.role === "admin" ? "/dashboard-admin" : "/dashboard/ringkasan";
+        const redirectTo = resolvedUser.role === "admin" ? "/dashboard-admin" : "/dashboard/ringkasan";
         return { success: true, redirectTo };
       }
 
       return { success: false, error: "Terjadi kesalahan.", redirectTo: "" };
     },
-    [refreshSchools, syncUserProfile],
+    [refreshSchools],
   );
 
   const register = useCallback(
@@ -374,6 +408,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     writeE2EUser(null);
   }, []);
 
+  const updateSchoolApprovalStatus = useCallback(
+    async (
+      schoolId: string,
+      status: SchoolApprovalStatus,
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        await updateSchoolApprovalStatusInProfiles(schoolId, status);
+        await refreshSchools();
+        return { success: true };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Gagal memperbarui status akun sekolah.";
+        return { success: false, error: message };
+      }
+    },
+    [refreshSchools],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: authUser,
@@ -385,10 +436,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resendSignupVerification,
       changePassword,
       updateAvatarPath,
+      updateSchoolApprovalStatus,
       logout,
       refreshSchools,
     }),
-    [authLoading, authUser, registeredSchools, login, register, resendSignupVerification, changePassword, updateAvatarPath, logout, refreshSchools],
+    [authLoading, authUser, registeredSchools, login, register, resendSignupVerification, changePassword, updateAvatarPath, updateSchoolApprovalStatus, logout, refreshSchools],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
