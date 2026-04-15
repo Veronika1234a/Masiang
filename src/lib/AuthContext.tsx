@@ -91,7 +91,10 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const E2E_USER_STORAGE_KEY = "masiang-e2e-user";
-const isE2EMode = process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1";
+const isE2EMode =
+  process.env.NEXT_PUBLIC_E2E_TEST_MODE === "1" &&
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 const HYDRATION_SNAPSHOT_SUBSCRIBE = () => () => {};
 
 function readE2EUserSnapshot(): string | null {

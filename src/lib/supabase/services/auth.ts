@@ -19,6 +19,14 @@ export interface SignUpPayload {
   address: string;
 }
 
+function isLocalE2EMode() {
+  if (process.env.NEXT_PUBLIC_E2E_TEST_MODE !== "1" || typeof window === "undefined") {
+    return false;
+  }
+
+  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+}
+
 function mapAuthErrorMessage(message?: string | null) {
   const normalized = (message ?? "").toLowerCase();
 
@@ -124,7 +132,7 @@ async function blockSchoolSession(
 }
 
 export async function signIn(email: string, password: string) {
-  if (process.env.NEXT_PUBLIC_E2E_TEST_MODE !== "1") {
+  if (!isLocalE2EMode()) {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: {
@@ -183,7 +191,7 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signUp(payload: SignUpPayload) {
-  if (process.env.NEXT_PUBLIC_E2E_TEST_MODE !== "1") {
+  if (!isLocalE2EMode()) {
     const response = await fetch("/api/register-school", {
       method: "POST",
       headers: {

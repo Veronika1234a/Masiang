@@ -743,9 +743,16 @@ export class MockSupabaseBackend {
     if (method === "PATCH") {
       const updates = parseBody(route.request().postData() ?? null) as Record<string, unknown> | null;
       const targetId = parseEq(url.searchParams.get("id"));
-      const account = this.state.accounts.find((item) => item.id === targetId);
+      const targetRole = parseEq(url.searchParams.get("role"));
+      const account = this.state.accounts.find(
+        (item) => item.id === targetId && (!targetRole || item.role === targetRole),
+      );
       if (!account || !updates) {
-        await json(route, 404, []);
+        if (shouldReturnObject(route)) {
+          await json(route, 406, { message: "No rows" });
+          return;
+        }
+        await json(route, 200, []);
         return;
       }
 
@@ -774,7 +781,13 @@ export class MockSupabaseBackend {
         account.approval_rejection_reason = updates.approval_rejection_reason ? String(updates.approval_rejection_reason) : null;
       }
 
-      await json(route, 200, []);
+      const row = toProfileRow(account);
+      if (shouldReturnObject(route)) {
+        await json(route, 200, row);
+        return;
+      }
+
+      await json(route, 200, [row]);
       return;
     }
 

@@ -126,7 +126,7 @@ export async function updateSchoolApprovalStatus(
   rejectionReason?: string,
 ): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .update({
       approval_status: approvalStatus,
@@ -135,9 +135,21 @@ export async function updateSchoolApprovalStatus(
       approval_rejection_reason: approvalStatus === "rejected" ? (rejectionReason ?? "") : null,
     })
     .eq("id", userId)
-    .eq("role", "school");
+    .eq("role", "school")
+    .select("id, approval_status, approval_reviewed_at, approval_reviewed_by, approval_rejection_reason")
+    .single();
 
   if (error) {
     throw error;
+  }
+
+  if (
+    !data ||
+    data.approval_status !== approvalStatus ||
+    !data.approval_reviewed_at ||
+    data.approval_reviewed_by !== reviewerId ||
+    (approvalStatus === "rejected" && !data.approval_rejection_reason)
+  ) {
+    throw new Error("Status akun sekolah belum tersimpan. Coba lagi atau cek koneksi Supabase.");
   }
 }
