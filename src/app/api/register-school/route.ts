@@ -149,8 +149,13 @@ export async function POST(request: Request) {
     email,
     password,
     email_confirm: true,
+    app_metadata: {
+      role: "school",
+      approval_status: "pending",
+    },
     user_metadata: {
       role: "school",
+      approval_status: "pending",
       school_name: schoolName,
       npsn,
       contact_name: contactName,

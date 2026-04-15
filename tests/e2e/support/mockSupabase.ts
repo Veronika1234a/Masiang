@@ -251,6 +251,8 @@ function toAuthUser(account: MockAccount) {
     app_metadata: {
       provider: "email",
       providers: ["email"],
+      role: account.role,
+      approval_status: account.approval_status,
     },
     user_metadata: {
       role: account.role,

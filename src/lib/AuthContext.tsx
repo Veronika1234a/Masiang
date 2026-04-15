@@ -147,14 +147,27 @@ function buildAuthUser(
   user: User,
   profile?: ProfileSnapshot | null,
 ): AuthUser {
-  const metadata = user.user_metadata as {
+  const appMetadata = user.app_metadata as {
     role?: string;
+    approval_status?: string;
+  } | undefined;
+  const metadata = user.user_metadata as {
     school_name?: string;
     contact_name?: string;
     avatar_path?: string;
   } | undefined;
+  const appRole =
+    appMetadata?.role === "admin" || appMetadata?.role === "school"
+      ? appMetadata.role
+      : undefined;
+  const appApprovalStatus =
+    appMetadata?.approval_status === "pending" ||
+    appMetadata?.approval_status === "approved" ||
+    appMetadata?.approval_status === "rejected"
+      ? appMetadata.approval_status
+      : undefined;
 
-  const role = (profile?.role ?? metadata?.role ?? "school") as UserRole;
+  const role = (profile?.role ?? appRole ?? "school") as UserRole;
   const name =
     profile?.school_name ??
     profile?.contact_name ??
@@ -172,7 +185,38 @@ function buildAuthUser(
     approvalStatus:
       role === "admin"
         ? "approved"
-        : ((profile?.approval_status as SchoolApprovalStatus | null) ?? "pending"),
+        : ((profile?.approval_status as SchoolApprovalStatus | null) ?? appApprovalStatus ?? "pending"),
+  };
+}
+
+function getTrustedProfileSnapshotFromUser(user: User): ProfileSnapshot | null {
+  const appMetadata = user.app_metadata as Record<string, unknown> | null;
+  const userMetadata = user.user_metadata as Record<string, unknown> | null;
+  const role = appMetadata?.role;
+
+  if (role !== "admin" && role !== "school") {
+    return null;
+  }
+
+  const approvalStatus =
+    role === "admin" ? "approved" : appMetadata?.approval_status;
+
+  if (
+    role === "school" &&
+    approvalStatus !== "pending" &&
+    approvalStatus !== "approved" &&
+    approvalStatus !== "rejected"
+  ) {
+    return null;
+  }
+
+  return {
+    role,
+    approval_status: approvalStatus as string,
+    school_name: typeof userMetadata?.school_name === "string" ? userMetadata.school_name : null,
+    contact_name: typeof userMetadata?.contact_name === "string" ? userMetadata.contact_name : null,
+    email: user.email ?? null,
+    avatar_path: typeof userMetadata?.avatar_path === "string" ? userMetadata.avatar_path : null,
   };
 }
 
@@ -228,7 +272,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const syncUserProfile = useCallback(
     async (nextUser: User) => {
-      const profile = await getProfile(nextUser.id);
+      const trustedProfile = getTrustedProfileSnapshotFromUser(nextUser);
+      const profile = trustedProfile ?? await getProfile(nextUser.id);
       if (!profile) {
         await supaSignOut().catch(() => null);
         setUser(null);

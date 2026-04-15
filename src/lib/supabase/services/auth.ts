@@ -4,6 +4,10 @@ import type { Database } from "../types";
 import type { SchoolApprovalStatus } from "./profiles";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+type AuthProfileSnapshot = Pick<
+  Profile,
+  "role" | "approval_status" | "school_name" | "contact_name" | "email" | "avatar_path"
+>;
 
 export interface SignUpPayload {
   email: string;
@@ -45,6 +49,43 @@ function getApprovalStatus(profile: Profile | null): SchoolApprovalStatus {
   return (profile?.approval_status as SchoolApprovalStatus | null) ?? "pending";
 }
 
+function getString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function getTrustedProfileFromAuthUser(user: User): AuthProfileSnapshot | null {
+  const appMetadata = user.app_metadata as Record<string, unknown> | null;
+  const userMetadata = user.user_metadata as Record<string, unknown> | null;
+  const role = getString(appMetadata?.role);
+
+  if (role !== "admin" && role !== "school") {
+    return null;
+  }
+
+  const approvalStatus =
+    role === "admin"
+      ? "approved"
+      : getString(appMetadata?.approval_status) ?? "pending";
+
+  if (
+    role === "school" &&
+    approvalStatus !== "pending" &&
+    approvalStatus !== "approved" &&
+    approvalStatus !== "rejected"
+  ) {
+    return null;
+  }
+
+  return {
+    role,
+    approval_status: approvalStatus,
+    school_name: getString(userMetadata?.school_name),
+    contact_name: getString(userMetadata?.contact_name),
+    email: user.email ?? "",
+    avatar_path: getString(userMetadata?.avatar_path),
+  };
+}
+
 async function fetchProfileRecord(
   supabase: ReturnType<typeof createClient>,
   userId: string,
@@ -83,6 +124,29 @@ async function blockSchoolSession(
 }
 
 export async function signIn(email: string, password: string) {
+  if (process.env.NEXT_PUBLIC_E2E_TEST_MODE !== "1") {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
+    const body = (await response.json().catch(() => null)) as
+      | { user?: User; profile?: AuthProfileSnapshot; error?: string }
+      | null;
+
+    if (!response.ok) {
+      return { user: null, profile: null, error: mapAuthErrorMessage(body?.error) };
+    }
+
+    if (!body?.user || !body.profile) {
+      return { user: null, profile: null, error: "Terjadi kesalahan autentikasi." };
+    }
+
+    return { user: body.user, profile: body.profile, error: null };
+  }
+
   const supabase = createClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -91,7 +155,8 @@ export async function signIn(email: string, password: string) {
   if (error) return { user: null, profile: null, error: mapAuthErrorMessage(error.message) };
   if (!data.user) return { user: null, profile: null, error: "Terjadi kesalahan autentikasi." };
 
-  const profile = await fetchProfileRecord(supabase, data.user.id);
+  const trustedProfile = getTrustedProfileFromAuthUser(data.user);
+  const profile = trustedProfile ?? await fetchProfileRecord(supabase, data.user.id);
   if (!profile) {
     await supabase.auth.signOut();
     return {
@@ -102,7 +167,8 @@ export async function signIn(email: string, password: string) {
   }
 
   if (profile.role === "school") {
-    const approvalStatus = getApprovalStatus(profile);
+    const approvalStatus =
+      (profile.approval_status as SchoolApprovalStatus | null) ?? getApprovalStatus(null);
 
     if (approvalStatus === "pending") {
       return blockSchoolSession("Akun menunggu verifikasi operator sekolah.");

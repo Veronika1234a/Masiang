@@ -43,16 +43,28 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  let user = null;
+  let userId: string | null = null;
+  let role: string | null = null;
+  let approvalStatus: string | null = null;
+
   try {
-    // Refresh the session so it doesn't expire.
-    const result = await supabase.auth.getUser();
-    user = result.data.user ?? null;
+    const result = await supabase.auth.getClaims();
+    const claims = result.data?.claims as Record<string, unknown> | undefined;
+    const appMetadata = claims?.app_metadata as Record<string, unknown> | undefined;
+
+    userId = typeof claims?.sub === "string" ? claims.sub : null;
+    role = typeof appMetadata?.role === "string" ? appMetadata.role : null;
+    approvalStatus =
+      typeof appMetadata?.approval_status === "string"
+        ? appMetadata.approval_status
+        : null;
   } catch {
-    user = null;
+    userId = null;
+    role = null;
+    approvalStatus = null;
   }
 
-  if (!user) {
+  if (!userId) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set(
@@ -62,19 +74,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  let role: string | null = null;
-  let approvalStatus: string | null = null;
-  try {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, approval_status")
-      .eq("id", user.id)
-      .single();
-    role = profile?.role ?? null;
-    approvalStatus = profile?.approval_status ?? null;
-  } catch {
-    role = null;
-    approvalStatus = null;
+  if (
+    !role ||
+    (role === "school" && !approvalStatus)
+  ) {
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, approval_status")
+        .eq("id", userId)
+        .single();
+      role = profile?.role ?? null;
+      approvalStatus = profile?.approval_status ?? null;
+    } catch {
+      role = null;
+      approvalStatus = null;
+    }
   }
 
   if (!role) {
