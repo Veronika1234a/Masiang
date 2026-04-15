@@ -17,6 +17,13 @@ async function logout(page: Parameters<typeof test>[0]["page"]) {
   await expect(page).toHaveURL(/\/login(?:\?.*)?$/);
 }
 
+function dateOffsetIso(days: number) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 test("school registration and admin flow stay functional end-to-end", async ({ page, backend }) => {
   backend.reset();
 
@@ -64,10 +71,11 @@ test("school registration and admin flow stay functional end-to-end", async ({ p
   await expect(page).toHaveURL(/\/dashboard\/booking-baru$/);
   await expect(page.getByLabel("Topik Pendampingan")).toBeVisible();
   await expect(page.getByLabel("Tanggal")).toBeVisible();
+  const bookingDate = dateOffsetIso(7);
 
   await page.getByLabel("Topik Pendampingan").fill("Pendampingan Program Kerja Tahunan");
   await page.getByLabel("Kategori Layanan").selectOption("Pendampingan");
-  await page.getByLabel("Tanggal").fill("2026-04-10");
+  await page.getByLabel("Tanggal").fill(bookingDate);
   await page.getByLabel("Sesi").selectOption("09.00 - 12.00 WITA");
   await page.getByLabel("Tujuan Pendampingan").fill("Menyelaraskan program kerja sekolah dengan target semester.");
   await page.getByLabel("Catatan Tambahan").fill("Butuh review prioritas program dan indikator keberhasilan.");

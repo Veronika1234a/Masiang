@@ -15,6 +15,10 @@ function badRequest(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export async function POST(request: Request) {
   let body: RegisterSchoolRequest;
 
@@ -24,7 +28,7 @@ export async function POST(request: Request) {
     return badRequest("Payload registrasi tidak valid.");
   }
 
-  const email = body.email?.trim();
+  const email = body.email?.trim().toLowerCase();
   const password = body.password ?? "";
   const schoolName = body.schoolName?.trim();
   const npsn = body.npsn?.trim();
@@ -36,11 +40,51 @@ export async function POST(request: Request) {
     return badRequest("Data registrasi belum lengkap.");
   }
 
+  if (!isValidEmail(email)) {
+    return badRequest("Format email tidak valid.");
+  }
+
+  if (!/^\d{8}$/.test(npsn)) {
+    return badRequest("NPSN harus 8 digit angka.");
+  }
+
+  if (password.length < 8) {
+    return badRequest("Password minimal 8 karakter.");
+  }
+
   let adminClient;
   try {
     adminClient = createAdminClient();
   } catch {
     return badRequest("Registrasi server belum siap. Hubungi admin sistem.", 500);
+  }
+
+  const { data: existingEmailProfile, error: existingEmailError } = await adminClient
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (existingEmailError) {
+    return badRequest("Gagal memvalidasi email sekolah. Coba lagi.", 500);
+  }
+
+  if (existingEmailProfile) {
+    return badRequest("Email ini sudah terdaftar. Silakan login atau hubungi operator sekolah.", 409);
+  }
+
+  const { data: existingNpsnProfile, error: existingNpsnError } = await adminClient
+    .from("profiles")
+    .select("id")
+    .eq("npsn", npsn)
+    .maybeSingle();
+
+  if (existingNpsnError) {
+    return badRequest("Gagal memvalidasi NPSN sekolah. Coba lagi.", 500);
+  }
+
+  if (existingNpsnProfile) {
+    return badRequest("NPSN ini sudah terdaftar. Silakan login atau hubungi operator sekolah.", 409);
   }
 
   const { data, error } = await adminClient.auth.admin.createUser({
@@ -63,12 +107,53 @@ export async function POST(request: Request) {
       return badRequest("Email ini sudah terdaftar. Silakan login atau hubungi operator sekolah.", 409);
     }
 
+    if (normalized.includes("database error") || error.code === "unexpected_failure") {
+      return badRequest("Registrasi gagal karena data sekolah bentrok atau database belum sinkron. Periksa email/NPSN atau hubungi admin sistem.", 500);
+    }
+
     return badRequest(error.message || "Registrasi gagal.", 500);
+  }
+
+  const userId = data.user?.id;
+  if (!userId) {
+    return badRequest("Registrasi gagal membuat akun sekolah.", 500);
+  }
+
+  const { data: createdProfile, error: profileCheckError } = await adminClient
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileCheckError) {
+    await adminClient.auth.admin.deleteUser(userId).catch(() => null);
+    return badRequest("Registrasi gagal memvalidasi profil sekolah.", 500);
+  }
+
+  if (!createdProfile) {
+    const { error: insertProfileError } = await adminClient
+      .from("profiles")
+      .insert({
+        id: userId,
+        role: "school",
+        approval_status: "pending",
+        school_name: schoolName,
+        npsn,
+        contact_name: contactName,
+        email,
+        phone,
+        address,
+      });
+
+    if (insertProfileError) {
+      await adminClient.auth.admin.deleteUser(userId).catch(() => null);
+      return badRequest("Registrasi gagal membuat profil sekolah. Hubungi admin sistem.", 500);
+    }
   }
 
   return NextResponse.json(
     {
-      userId: data.user?.id ?? null,
+      userId,
       email,
       status: "pending",
     },
