@@ -8,8 +8,8 @@ const assets = {
   texture: "/assets/masiang/texture.svg",
   logo: "/assets/masiang/logo.svg",
   heroPreview: "/assets/masiang/hero-preview.svg",
-  realPhoto: "/assets/masiang/pak-ilyas-photo.jpg",
-  aboutPhoto: "/assets/masiang/about-photo.svg",
+  realPhoto: "/assets/masiang/photo.png",
+  aboutPhoto: "/assets/masiang/photo.png",
   iconPerson: "/assets/masiang/step-person.svg",
   iconDoc: "/assets/masiang/step-doc.svg",
   iconUpload: "/assets/masiang/step-upload.svg",
@@ -91,8 +91,9 @@ const missionPoints = [
 ];
 
 const contactDetails = {
-  phone: "+62 812 3456 7890",
-  address: "Jl. Pendidikan No. 21, Tana Toraja",
+  phone: "085341111160",
+  address: "Jln. Tongkonan Ada' Nomor 2 Makale, Keluarahan Bombongan, Kecamatan Makale, Tana Toraja",
+  hours: "07.00 - 16.00 WITA",
 };
 
 const contactItems = [
@@ -108,7 +109,7 @@ const contactItems = [
   },
   {
     title: "Jam Operasional",
-    value: ["Senin - Jumat, 08.00 - 16.30 WITA"],
+    value: [contactDetails.hours],
     icon: assets.footerClock,
   },
 ];
@@ -266,6 +267,9 @@ export default function Home() {
             </p>
             <p className="mt-3 text-[13px] leading-[1.55] text-[#62739a]">
               {contactDetails.address}
+            </p>
+            <p className="mt-3 text-[13px] font-semibold leading-[1.55] text-[#1f2f4f]">
+              {contactDetails.hours}
             </p>
           </div>
         </aside>

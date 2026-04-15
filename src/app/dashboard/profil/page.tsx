@@ -30,8 +30,7 @@ const profileSections: Array<{
       {
         key: "officialEmail",
         label: "Email Login",
-        readOnly: true,
-        helperText: "Untuk menjaga konsistensi session, email login belum diubah langsung dari halaman ini.",
+        helperText: "Email login akan diperbarui di akun Supabase dan profil sekolah.",
       },
       { key: "phone", label: "Nomor Telepon" },
       { key: "principalName", label: "Kepala Sekolah" },
@@ -52,7 +51,7 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
 }
 
 export default function DashboardProfilPage() {
-  const { user, changePassword, updateAvatarPath } = useAuth();
+  const { user, changePassword, updateAvatarPath, updateEmail } = useAuth();
   const { profile, updateProfile, bookings, histories, documents, addToast } = useDashboard();
   const [draft, setDraft] = useState<SchoolProfile>(profile);
   const [isEditing, setIsEditing] = useState(false);
@@ -105,15 +104,7 @@ export default function DashboardProfilPage() {
         return;
       }
 
-      const seedUrl = storageSvc.getSeedDocumentDownloadUrl("avatar", resolvedAvatarPath);
-      if (seedUrl) {
-        if (!cancelled) {
-          setAvatarUrl(seedUrl);
-        }
-        return;
-      }
-
-      const signedUrl = await storageSvc.getSignedUrl(resolvedAvatarPath);
+      const signedUrl = await storageSvc.resolveDownloadUrl(resolvedAvatarPath);
       if (!cancelled) {
         setAvatarUrl(signedUrl);
       }
@@ -131,9 +122,24 @@ export default function DashboardProfilPage() {
       setNpsnError("NPSN harus 8 digit angka.");
       return;
     }
+    const normalizedEmail = draft.officialEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      addToast("Gunakan format email yang valid untuk email login.", "error");
+      return;
+    }
     setNpsnError("");
     try {
-      await updateProfile(draft);
+      const nextProfile = { ...draft, officialEmail: normalizedEmail };
+
+      if (normalizedEmail !== profile.officialEmail.trim().toLowerCase()) {
+        const emailResult = await updateEmail(normalizedEmail);
+        if (!emailResult.success) {
+          throw new Error(emailResult.error ?? "Gagal memperbarui email login.");
+        }
+      }
+
+      await updateProfile(nextProfile);
+      setDraft(nextProfile);
       setIsEditing(false);
     } catch {
       // Error toast is handled in context.
@@ -218,35 +224,30 @@ export default function DashboardProfilPage() {
       }
 
       newPath = uploadResult.path;
-      const oldPath = resolvedAvatarPath;
+      const oldPath = resolvedAvatarPath ?? null;
+
+      await updateProfile({ avatarPath: newPath });
 
       const avatarResult = await updateAvatarPath(newPath);
       if (!avatarResult.success) {
         throw new Error(avatarResult.error ?? "Gagal menyimpan foto profil.");
       }
 
-      try {
-        await updateProfile({ avatarPath: newPath });
-      } catch (error) {
-        const message = error instanceof Error ? error.message.toLowerCase() : "";
-        if (message.includes("avatar_path")) {
-          addToast("Foto profil tersimpan lewat akun login. Jalankan migration database agar kolom avatar ikut tersinkron.", "info");
-        } else {
-          addToast("Foto profil tersimpan, tetapi sinkronisasi profil database gagal. Coba refresh halaman.", "info");
-        }
-      }
-
       if (oldPath && oldPath !== newPath) {
         try {
-          if (!storageSvc.getSeedDocumentDownloadUrl("avatar", oldPath)) {
-            await storageSvc.deleteFile(oldPath);
-          }
+          await storageSvc.deleteFile(oldPath);
         } catch (cleanupError) {
           console.error("profile avatar cleanup error:", cleanupError);
           addToast("Foto profil baru tersimpan, tetapi file lama belum berhasil dibersihkan.", "info");
         }
       }
     } catch (error) {
+      if (resolvedAvatarPath !== undefined) {
+        await updateAvatarPath(resolvedAvatarPath ?? null).catch((rollbackError) => {
+          console.error("profile avatar metadata rollback error:", rollbackError);
+        });
+      }
+
       if (newPath) {
         try {
           await storageSvc.deleteFile(newPath);

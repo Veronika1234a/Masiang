@@ -5,8 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useDashboard } from "@/lib/DashboardContext";
 import {
-  getSeedDocumentDownloadUrl,
-  getSignedUrl,
+  resolveDownloadUrl,
 } from "@/lib/supabase/services/storage";
 import {
   formatLongDateID,
@@ -70,26 +69,14 @@ export default function HistoryDetailPage() {
 
   const handleDownload = async (documentId: string, fileName: string) => {
     const fullDocument = documents.find((item) => item.id === documentId);
-    const seedDownloadUrl = getSeedDocumentDownloadUrl(
-      documentId,
-      fullDocument?.storagePath,
-    );
-    const shouldUseSeedDownload =
-      Boolean(seedDownloadUrl) &&
-      (!fullDocument?.storagePath ||
-        fullDocument.storagePath.startsWith("__seed__/") ||
-        fullDocument.storagePath.startsWith("/"));
-    if (!fullDocument?.storagePath && !seedDownloadUrl) {
+    if (!fullDocument?.storagePath) {
       addToast(`Dokumen "${fileName}" belum tersedia untuk diunduh.`, "info");
       return;
     }
 
     setDownloadingId(documentId);
     try {
-      const signedUrl = !shouldUseSeedDownload && fullDocument?.storagePath
-        ? await getSignedUrl(fullDocument.storagePath)
-        : null;
-      const downloadUrl = signedUrl ?? seedDownloadUrl;
+      const downloadUrl = await resolveDownloadUrl(fullDocument.storagePath);
       if (!downloadUrl) {
         addToast(`Gagal membuat link unduhan untuk "${fileName}".`, "error");
         return;
@@ -215,8 +202,8 @@ export default function HistoryDetailPage() {
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                       <span className={`inline-flex rounded-md px-3 py-1.5 text-[11px] font-bold uppercase ${getCategoryClasses(doc.category)}`}>{doc.category}</span>
-                      <button type="button" disabled={(!linkedDocument?.storagePath && !getSeedDocumentDownloadUrl(doc.id, linkedDocument?.storagePath)) || downloadingId === doc.id} onClick={() => void handleDownload(doc.id, doc.fileName)} className="rounded-lg border border-[#cfd5e6] bg-[#f9f8fc] px-3 py-2 text-[12px] font-bold uppercase text-[#4f5b77] hover:bg-[#eef1f8] disabled:cursor-not-allowed disabled:opacity-50">
-                        {downloadingId === doc.id ? "Memuat..." : linkedDocument?.storagePath || getSeedDocumentDownloadUrl(doc.id, linkedDocument?.storagePath) ? "Unduh" : "Tidak Tersedia"}
+                      <button type="button" disabled={!linkedDocument?.storagePath || downloadingId === doc.id} onClick={() => void handleDownload(doc.id, doc.fileName)} className="rounded-lg border border-[#cfd5e6] bg-[#f9f8fc] px-3 py-2 text-[12px] font-bold uppercase text-[#4f5b77] hover:bg-[#eef1f8] disabled:cursor-not-allowed disabled:opacity-50">
+                        {downloadingId === doc.id ? "Memuat..." : linkedDocument?.storagePath ? "Unduh" : "Tidak Tersedia"}
                       </button>
                     </div>
                   </article>

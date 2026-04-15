@@ -100,7 +100,7 @@ This directory owns all shared state, auth logic, data orchestration, and Supaba
 | `documents.ts` | `fetchDocuments`, `insertDocument`, `updateDocument`, `deleteDocument` | documents |
 | `histories.ts` | `fetchHistories`, `insertHistory`, `updateHistory` | histories |
 | `notifications.ts` | `fetchNotifications`, `insertNotification`, `markRead(userId, notifId)` | notifications |
-| `storage.ts` | `uploadFile`, `getSignedUrl`, `getSeedDocumentDownloadUrl`, `deleteFile` | storage (school-documents bucket) |
+| `storage.ts` | `uploadFile`, `getSignedUrl`, `resolveDownloadUrl`, `deleteFile` | storage (school-documents bucket) |
 
 ### Row-to-Model Mappers
 Each service exports a mapper function (`rowToBooking`, `rowToDocument`, `rowToHistory`) that converts Supabase rows to in-memory types. These populate the optional `schoolId` field from `school_id` column.

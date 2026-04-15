@@ -207,6 +207,21 @@ export async function updateUserMetadata(
   return { user: data.user, error: null };
 }
 
+export async function updateEmail(
+  nextEmail: string,
+): Promise<{ user: User | null; error: string | null }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.updateUser({
+    email: nextEmail.trim(),
+  });
+
+  if (error) {
+    return { user: null, error: mapAuthErrorMessage(error.message) };
+  }
+
+  return { user: data.user, error: null };
+}
+
 export async function getSession() {
   const supabase = createClient();
   const {

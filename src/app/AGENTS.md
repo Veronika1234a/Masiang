@@ -24,8 +24,8 @@ All routes live under `src/app/` following Next.js 16 App Router conventions. Tw
 /dashboard-admin/booking/[bookingId] Admin booking detail
 /dashboard-admin/dokumen       Document review (approve/revise)
 /dashboard-admin/sekolah       School list with per-school stats + detail modal
-/dashboard-admin/detail-dokumen Document detail view (seed/static)
-/dashboard-admin/semua-dokumen All documents view (seed/static)
+/dashboard-admin/detail-dokumen Document detail view
+/dashboard-admin/semua-dokumen All documents view
 ```
 
 ## Layout Chain
@@ -67,7 +67,7 @@ All dashboard routes consume `useDashboard()` from `DashboardContext`, which loa
 ## Seed Data
 
 - `src/lib/userDashboardData.ts` exports seed functions: `getBookingSeed()`, `getRiwayatSeed()`, `getUserDocumentSeed()`, `getSchoolProfile()`, `getNotificationSeed()`.
-- `src/app/api/seed-documents/` provides static document downloads for seed DOC-004 and DOC-005.
+- Document downloads now resolve from direct links or Supabase Storage signed URLs; no bundled seed download route remains.
 
 ## Conventions
 - Dynamic routes use `[bookingId]` and `[historyId]` params.

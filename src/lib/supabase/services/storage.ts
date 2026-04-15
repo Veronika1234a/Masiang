@@ -1,10 +1,6 @@
 import { createClient } from "../client";
 
 const BUCKET = "school-documents";
-const seedDocumentMap: Record<string, string> = {
-  "DOC-004": "/api/seed-documents/DOC-004",
-  "DOC-005": "/api/seed-documents/DOC-005",
-};
 
 export function isDirectDownloadPath(path?: string | null): boolean {
   return Boolean(path && (/^https?:\/\//i.test(path) || path.startsWith("/")));
@@ -44,19 +40,19 @@ export async function getSignedUrl(
   return data.signedUrl;
 }
 
-export function getSeedDocumentDownloadUrl(
-  documentId: string,
+export async function resolveDownloadUrl(
   storagePath?: string | null,
-): string | null {
-  if (storagePath && isDirectDownloadPath(storagePath)) {
+  expiresIn = 3600,
+): Promise<string | null> {
+  if (!storagePath) {
+    return null;
+  }
+
+  if (isDirectDownloadPath(storagePath)) {
     return storagePath;
   }
 
-  if (storagePath?.startsWith("__seed__/")) {
-    return `/api/seed-documents/${encodeURIComponent(documentId)}`;
-  }
-
-  return seedDocumentMap[documentId] ?? null;
+  return getSignedUrl(storagePath, expiresIn);
 }
 
 export async function deleteFile(path: string): Promise<void> {

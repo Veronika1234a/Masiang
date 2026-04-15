@@ -19,6 +19,7 @@ import {
   resendSignupVerification as supaResendSignupVerification,
   getProfile,
   updateUserMetadata as supaUpdateUserMetadata,
+  updateEmail as supaUpdateEmail,
   type SignUpPayload,
 } from "./supabase/services/auth";
 import {
@@ -73,7 +74,8 @@ interface AuthContextValue {
   register(data: RegisterInput): Promise<{ success: boolean; error?: string }>;
   resendSignupVerification(email: string): Promise<{ success: boolean; error?: string }>;
   changePassword(currentPassword: string, nextPassword: string): Promise<{ success: boolean; error?: string }>;
-  updateAvatarPath(nextPath: string): Promise<{ success: boolean; error?: string }>;
+  updateAvatarPath(nextPath: string | null): Promise<{ success: boolean; error?: string }>;
+  updateEmail(nextEmail: string): Promise<{ success: boolean; error?: string }>;
   updateSchoolApprovalStatus(
     schoolId: string,
     status: SchoolApprovalStatus,
@@ -379,7 +381,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const updateAvatarPath = useCallback(
-    async (nextPath: string): Promise<{ success: boolean; error?: string }> => {
+    async (nextPath: string | null): Promise<{ success: boolean; error?: string }> => {
       const result = await supaUpdateUserMetadata({ avatar_path: nextPath });
       if (result.error) {
         return { success: false, error: result.error };
@@ -387,6 +389,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (result.user) {
         const nextAuthUser = buildAuthUser(result.user);
+        setUser(nextAuthUser);
+        writeE2EUser(nextAuthUser);
+      }
+
+      return { success: true };
+    },
+    [],
+  );
+
+  const updateEmail = useCallback(
+    async (nextEmail: string): Promise<{ success: boolean; error?: string }> => {
+      const result = await supaUpdateEmail(nextEmail);
+      if (result.error) {
+        return { success: false, error: result.error };
+      }
+
+      if (result.user) {
+        const profile = await getProfile(result.user.id).catch(() => null);
+        const nextAuthUser = buildAuthUser(result.user, profile);
         setUser(nextAuthUser);
         writeE2EUser(nextAuthUser);
       }
@@ -436,11 +457,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resendSignupVerification,
       changePassword,
       updateAvatarPath,
+      updateEmail,
       updateSchoolApprovalStatus,
       logout,
       refreshSchools,
     }),
-    [authLoading, authUser, registeredSchools, login, register, resendSignupVerification, changePassword, updateAvatarPath, updateSchoolApprovalStatus, logout, refreshSchools],
+    [authLoading, authUser, registeredSchools, login, register, resendSignupVerification, changePassword, updateAvatarPath, updateEmail, updateSchoolApprovalStatus, logout, refreshSchools],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

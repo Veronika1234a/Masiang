@@ -546,11 +546,16 @@ export class MockSupabaseBackend {
 
       const body = parseBody(route.request().postData() ?? null) as {
         password?: string;
+        email?: string;
         data?: Record<string, unknown>;
       } | null;
 
       if (body?.password !== undefined) {
         account.password = String(body.password);
+      }
+
+      if (body?.email !== undefined) {
+        account.email = String(body.email).trim().toLowerCase();
       }
 
       if (body?.data) {

@@ -5,9 +5,8 @@ import { Modal } from "@/components/ui/Modal";
 import { useDashboard } from "@/lib/DashboardContext";
 import { ALL_STAGES, type DocumentReviewStatus, type SchoolDocument } from "@/lib/userDashboardData";
 import {
-  getSeedDocumentDownloadUrl,
-  getSignedUrl,
   isDirectDownloadPath,
+  resolveDownloadUrl,
 } from "@/lib/supabase/services/storage";
 
 const ALL_REVIEW_STATUSES: DocumentReviewStatus[] = [
@@ -63,8 +62,7 @@ export default function AdminDokumenPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const handleDownload = async (doc: SchoolDocument) => {
-    const seedDownloadUrl = getSeedDocumentDownloadUrl(doc.id, doc.storagePath);
-    if (!doc.storagePath && !seedDownloadUrl) {
+    if (!doc.storagePath) {
       addToast(`Dokumen "${doc.fileName}" belum memiliki file yang bisa dibuka.`, "info");
       return;
     }
@@ -76,10 +74,7 @@ export default function AdminDokumenPage() {
 
     setDownloadingId(doc.id);
     try {
-      const signedUrl = doc.storagePath
-        ? await getSignedUrl(doc.storagePath)
-        : null;
-      const downloadUrl = signedUrl ?? seedDownloadUrl;
+      const downloadUrl = await resolveDownloadUrl(doc.storagePath);
 
       if (!downloadUrl) {
         addToast(`Gagal membuat tautan untuk "${doc.fileName}".`, "error");
@@ -334,7 +329,7 @@ export default function AdminDokumenPage() {
                             Minta Revisi
                           </button>
                         ) : null}
-                        {document.storagePath || getSeedDocumentDownloadUrl(document.id, document.storagePath) ? (
+                        {document.storagePath ? (
                           <button
                             type="button"
                             onClick={() => handleDownload(document)}

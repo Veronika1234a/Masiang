@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getSeedDocumentDownloadUrl } from "../src/lib/supabase/services/storage";
+import { isDirectDownloadPath } from "../src/lib/supabase/services/storage";
 import type {
   BookingItem,
   Notification,
@@ -289,13 +289,9 @@ test("normalizeBookingSession normalizes free-text slot input", () => {
   );
 });
 
-test("getSeedDocumentDownloadUrl resolves bundled seed downloads", () => {
-  assert.equal(
-    getSeedDocumentDownloadUrl("DOC-004", null),
-    "/api/seed-documents/DOC-004",
-  );
-  assert.equal(
-    getSeedDocumentDownloadUrl("DOC-005", "__seed__/DOC-005"),
-    "/api/seed-documents/DOC-005",
-  );
+test("isDirectDownloadPath distinguishes direct links from storage object paths", () => {
+  assert.equal(isDirectDownloadPath("https://example.com/file.pdf"), true);
+  assert.equal(isDirectDownloadPath("/uploads/file.pdf"), true);
+  assert.equal(isDirectDownloadPath("school-1/1712675300_file.pdf"), false);
+  assert.equal(isDirectDownloadPath(undefined), false);
 });
