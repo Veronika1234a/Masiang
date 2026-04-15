@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -54,6 +55,9 @@ export interface RegisterInput {
 export interface RegisteredSchool extends RegisterInput {
   id: string;
   approvalStatus: SchoolApprovalStatus;
+  approvalReviewedAt?: string;
+  approvalReviewedBy?: string;
+  approvalRejectionReason?: string;
 }
 
 interface ProfileSnapshot {
@@ -75,10 +79,11 @@ interface AuthContextValue {
   resendSignupVerification(email: string): Promise<{ success: boolean; error?: string }>;
   changePassword(currentPassword: string, nextPassword: string): Promise<{ success: boolean; error?: string }>;
   updateAvatarPath(nextPath: string | null): Promise<{ success: boolean; error?: string }>;
-  updateEmail(nextEmail: string): Promise<{ success: boolean; error?: string }>;
+  updateEmail(nextEmail: string): Promise<{ success: boolean; error?: string; emailChanged: boolean }>;
   updateSchoolApprovalStatus(
     schoolId: string,
     status: SchoolApprovalStatus,
+    rejectionReason?: string,
   ): Promise<{ success: boolean; error?: string }>;
   logout(): Promise<void>;
   refreshSchools(): Promise<void>;
@@ -175,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(!isE2EMode);
   const [registeredSchools, setRegisteredSchools] = useState<RegisteredSchool[]>([]);
+  const manualLoginInFlightRef = useRef(false);
   const e2eUserSnapshot = useSyncExternalStore(subscribeToE2EUser, readE2EUserSnapshot, () => null);
   const isHydrated = useSyncExternalStore(HYDRATION_SNAPSHOT_SUBSCRIBE, () => true, () => false);
   const e2eUser = useMemo(() => {
@@ -209,6 +215,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             address: s.address,
             password: "",
             approvalStatus: s.approvalStatus,
+            approvalReviewedAt: s.approvalReviewedAt,
+            approvalReviewedBy: s.approvalReviewedBy,
+            approvalRejectionReason: s.approvalRejectionReason,
           }),
         ),
       );
@@ -241,15 +250,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(resolvedUser);
       writeE2EUser(resolvedUser);
 
-      if (resolvedUser.role === "admin") {
-        await refreshSchools();
-      } else {
+      if (resolvedUser.role !== "admin") {
         setRegisteredSchools([]);
       }
 
       return resolvedUser;
     },
-    [refreshSchools],
+    [],
   );
 
   useEffect(() => {
@@ -273,6 +280,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setRegisteredSchools([]);
         writeE2EUser(null);
+        return;
+      }
+
+      if (event === "SIGNED_IN" && manualLoginInFlightRef.current) {
         return;
       }
 
@@ -309,27 +320,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       identity: string,
       password: string,
     ): Promise<{ success: boolean; error?: string; redirectTo: string }> => {
-      const result = await supaSignIn(identity, password);
-      if (result.error) {
-        return { success: false, error: result.error, redirectTo: "" };
-      }
+      manualLoginInFlightRef.current = true;
 
-      if (result.user && result.profile) {
-        const resolvedUser = buildAuthUser(result.user, result.profile);
-        setUser(resolvedUser);
-        writeE2EUser(resolvedUser);
-        if (resolvedUser.role !== "admin") {
-          setRegisteredSchools([]);
-        } else {
-          await refreshSchools();
+      try {
+        const result = await supaSignIn(identity, password);
+        if (result.error) {
+          return { success: false, error: result.error, redirectTo: "" };
         }
-        const redirectTo = resolvedUser.role === "admin" ? "/dashboard-admin" : "/dashboard/ringkasan";
-        return { success: true, redirectTo };
-      }
 
-      return { success: false, error: "Terjadi kesalahan.", redirectTo: "" };
+        if (result.user && result.profile) {
+          const resolvedUser = buildAuthUser(result.user, result.profile);
+          setUser(resolvedUser);
+          writeE2EUser(resolvedUser);
+          if (resolvedUser.role !== "admin") {
+            setRegisteredSchools([]);
+          }
+          const redirectTo = resolvedUser.role === "admin" ? "/dashboard-admin" : "/dashboard/ringkasan";
+          return { success: true, redirectTo };
+        }
+
+        return { success: false, error: "Terjadi kesalahan.", redirectTo: "" };
+      } finally {
+        window.setTimeout(() => {
+          manualLoginInFlightRef.current = false;
+        }, 750);
+      }
     },
-    [refreshSchools],
+    [],
   );
 
   const register = useCallback(
@@ -399,10 +416,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const updateEmail = useCallback(
-    async (nextEmail: string): Promise<{ success: boolean; error?: string }> => {
+    async (nextEmail: string): Promise<{ success: boolean; error?: string; emailChanged: boolean }> => {
       const result = await supaUpdateEmail(nextEmail);
       if (result.error) {
-        return { success: false, error: result.error };
+        return { success: false, error: result.error, emailChanged: false };
       }
 
       if (result.user) {
@@ -412,7 +429,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         writeE2EUser(nextAuthUser);
       }
 
-      return { success: true };
+      return { success: true, emailChanged: result.emailChanged };
     },
     [],
   );
@@ -433,9 +450,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (
       schoolId: string,
       status: SchoolApprovalStatus,
+      rejectionReason?: string,
     ): Promise<{ success: boolean; error?: string }> => {
+      if (!authUser?.id || authUser.role !== "admin") {
+        return { success: false, error: "Hanya admin yang bisa memperbarui status akun sekolah." };
+      }
+
+      if (status === "rejected" && !rejectionReason?.trim()) {
+        return { success: false, error: "Alasan penolakan wajib diisi." };
+      }
+
       try {
-        await updateSchoolApprovalStatusInProfiles(schoolId, status);
+        await updateSchoolApprovalStatusInProfiles(
+          schoolId,
+          status,
+          authUser.id,
+          rejectionReason?.trim(),
+        );
         await refreshSchools();
         return { success: true };
       } catch (error) {
@@ -443,7 +474,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: message };
       }
     },
-    [refreshSchools],
+    [authUser, refreshSchools],
   );
 
   const value = useMemo<AuthContextValue>(

@@ -143,8 +143,11 @@ test("rejected school account cannot log in until status changes", async ({ page
   await page.goto("/dashboard-admin/sekolah");
   const schoolCard = page.locator("article", { hasText: schoolName });
   await schoolCard.getByRole("button", { name: "Tolak Akun" }).click();
+  await page.getByPlaceholder("Contoh: NPSN tidak sesuai data sekolah.").fill("Data sekolah belum sesuai dengan verifikasi operator.");
+  await page.getByRole("button", { name: "Konfirmasi Tolak" }).click();
   await expect(page.getByText("Akun sekolah ditandai ditolak.")).toBeVisible();
   await expect(schoolCard).toContainText("Ditolak");
+  expect(backend.state.accounts.find((account) => account.email === schoolEmail)?.approval_rejection_reason).toContain("Data sekolah");
 
   await logout(page);
 
@@ -214,4 +217,56 @@ test("admin login keeps route guard and main review actions working", async ({ p
   await page.getByPlaceholder("Jelaskan bagian yang perlu direvisi...").fill("Lengkapi indikator capaian program literasi semester ini.");
   await page.getByRole("button", { name: "Konfirmasi Minta Revisi" }).click();
   await expect(page.getByText(/Dokumen .* ditandai perlu revisi\./)).toBeVisible();
+});
+
+test("admin can repair and delete orphan auth accounts", async ({ page, backend }) => {
+  backend.reset();
+
+  backend.state.orphanAccounts.push({
+    ...backend.state.accounts[0],
+    id: "orphan-repair-1",
+    email: "orphan.repair@example.com",
+    password: "password123",
+    role: "school",
+    approval_status: "pending",
+    school_name: "SD Orphan Repair",
+    npsn: "55443322",
+    contact_name: "Operator Orphan",
+    phone: "081233344400",
+    address: "Jl. Orphan Repair No. 1",
+    approval_reviewed_at: null,
+    approval_reviewed_by: null,
+    approval_rejection_reason: null,
+  });
+  backend.state.orphanAccounts.push({
+    ...backend.state.accounts[0],
+    id: "orphan-delete-1",
+    email: "orphan.delete@example.com",
+    password: "password123",
+    role: "school",
+    approval_status: "pending",
+    school_name: "SD Orphan Delete",
+    npsn: "55443323",
+    contact_name: "Operator Delete",
+    phone: "081233344401",
+    address: "Jl. Orphan Delete No. 1",
+    approval_reviewed_at: null,
+    approval_reviewed_by: null,
+    approval_rejection_reason: null,
+  });
+
+  await login(page, "admin@example.com");
+  await expect(page).toHaveURL(/\/dashboard-admin$/);
+  await page.goto("/dashboard-admin/sekolah");
+
+  const repairRow = page.locator("article", { hasText: "SD Orphan Repair" });
+  await expect(repairRow).toContainText("Bisa diperbaiki");
+  await repairRow.getByRole("button", { name: "Perbaiki" }).click();
+  await expect(page.getByText("Akun yatim berhasil diperbaiki.")).toBeVisible();
+  expect(backend.state.accounts.some((account) => account.id === "orphan-repair-1")).toBeTruthy();
+
+  const deleteRow = page.locator("article", { hasText: "SD Orphan Delete" });
+  await deleteRow.getByRole("button", { name: "Hapus" }).click();
+  await expect(page.getByText("Akun yatim berhasil dihapus.")).toBeVisible();
+  expect(backend.state.orphanAccounts.some((account) => account.id === "orphan-delete-1")).toBeFalsy();
 });

@@ -130,11 +130,23 @@ export default function DashboardProfilPage() {
     setNpsnError("");
     try {
       const nextProfile = { ...draft, officialEmail: normalizedEmail };
+      const shouldChangeEmail = normalizedEmail !== profile.officialEmail.trim().toLowerCase();
+      const profilePayload = shouldChangeEmail
+        ? { ...nextProfile, officialEmail: profile.officialEmail }
+        : nextProfile;
 
-      if (normalizedEmail !== profile.officialEmail.trim().toLowerCase()) {
+      if (shouldChangeEmail) {
         const emailResult = await updateEmail(normalizedEmail);
         if (!emailResult.success) {
           throw new Error(emailResult.error ?? "Gagal memperbarui email login.");
+        }
+
+        if (!emailResult.emailChanged) {
+          await updateProfile(profilePayload);
+          setDraft(profilePayload);
+          setIsEditing(false);
+          addToast("Cek inbox email baru untuk konfirmasi perubahan email login. Email profil belum diubah sampai konfirmasi selesai.", "info");
+          return;
         }
       }
 

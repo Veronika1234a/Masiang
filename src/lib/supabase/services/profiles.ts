@@ -14,6 +14,9 @@ export interface RegisteredSchoolProfile {
   phone: string;
   address: string;
   approvalStatus: SchoolApprovalStatus;
+  approvalReviewedAt?: string;
+  approvalReviewedBy?: string;
+  approvalRejectionReason?: string;
 }
 
 function rowToSchoolProfile(row: ProfileRow): SchoolProfile {
@@ -42,6 +45,9 @@ function rowToRegisteredSchool(row: ProfileRow): RegisteredSchoolProfile {
     phone: row.phone ?? "",
     address: row.address ?? "",
     approvalStatus: (row.approval_status as SchoolApprovalStatus | null) ?? "pending",
+    approvalReviewedAt: row.approval_reviewed_at ?? undefined,
+    approvalReviewedBy: row.approval_reviewed_by ?? undefined,
+    approvalRejectionReason: row.approval_rejection_reason ?? undefined,
   };
 }
 
@@ -116,11 +122,18 @@ export async function fetchAdminUserIds(): Promise<string[]> {
 export async function updateSchoolApprovalStatus(
   userId: string,
   approvalStatus: SchoolApprovalStatus,
+  reviewerId: string,
+  rejectionReason?: string,
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
     .from("profiles")
-    .update({ approval_status: approvalStatus })
+    .update({
+      approval_status: approvalStatus,
+      approval_reviewed_at: new Date().toISOString(),
+      approval_reviewed_by: reviewerId,
+      approval_rejection_reason: approvalStatus === "rejected" ? (rejectionReason ?? "") : null,
+    })
     .eq("id", userId)
     .eq("role", "school");
 

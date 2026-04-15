@@ -62,6 +62,26 @@ async function fetchProfileRecord(
   return data as Profile;
 }
 
+async function blockSchoolSession(
+  message: string,
+): Promise<{ user: null; profile: null; error: string }> {
+  const supabase = createClient();
+  const { error: signOutError } = await supabase.auth.signOut({ scope: "global" });
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (signOutError || session) {
+    return {
+      user: null,
+      profile: null,
+      error: "Akun belum aktif dan sesi gagal dibersihkan. Tutup browser lalu coba lagi, atau hubungi admin.",
+    };
+  }
+
+  return { user: null, profile: null, error: message };
+}
+
 export async function signIn(email: string, password: string) {
   const supabase = createClient();
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -85,21 +105,11 @@ export async function signIn(email: string, password: string) {
     const approvalStatus = getApprovalStatus(profile);
 
     if (approvalStatus === "pending") {
-      await supabase.auth.signOut();
-      return {
-        user: null,
-        profile: null,
-        error: "Akun menunggu verifikasi operator sekolah.",
-      };
+      return blockSchoolSession("Akun menunggu verifikasi operator sekolah.");
     }
 
     if (approvalStatus === "rejected") {
-      await supabase.auth.signOut();
-      return {
-        user: null,
-        profile: null,
-        error: "Akun ditolak. Hubungi admin atau operator sekolah.",
-      };
+      return blockSchoolSession("Akun ditolak. Hubungi admin atau operator sekolah.");
     }
   }
 
@@ -209,17 +219,22 @@ export async function updateUserMetadata(
 
 export async function updateEmail(
   nextEmail: string,
-): Promise<{ user: User | null; error: string | null }> {
+): Promise<{ user: User | null; error: string | null; emailChanged: boolean }> {
   const supabase = createClient();
+  const normalizedEmail = nextEmail.trim().toLowerCase();
   const { data, error } = await supabase.auth.updateUser({
-    email: nextEmail.trim(),
+    email: normalizedEmail,
   });
 
   if (error) {
-    return { user: null, error: mapAuthErrorMessage(error.message) };
+    return { user: null, error: mapAuthErrorMessage(error.message), emailChanged: false };
   }
 
-  return { user: data.user, error: null };
+  return {
+    user: data.user,
+    error: null,
+    emailChanged: (data.user?.email ?? "").toLowerCase() === normalizedEmail,
+  };
 }
 
 export async function getSession() {

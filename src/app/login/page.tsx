@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/AuthContext";
@@ -41,6 +41,7 @@ function validate(values: LoginFormValues): LoginFormErrors {
 }
 
 function LoginPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
   const hasRedirectTarget = Boolean(searchParams.get("redirectTo"));
@@ -100,7 +101,7 @@ function LoginPageContent() {
           searchParams.get("redirectTo"),
           result.redirectTo,
         );
-        window.location.replace(redirectTo);
+        router.replace(redirectTo);
       } else {
         setIsSubmitting(false);
         setStatus("auth_error");

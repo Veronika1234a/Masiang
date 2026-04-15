@@ -253,7 +253,7 @@ test("school can update profile and admin can inspect schools and documents", as
   await page.locator("header").getByRole("button").first().click();
   await page.getByRole("button", { name: "Dokumen Baru" }).click();
   await expect(page).toHaveURL(/\/dashboard-admin\/detail-dokumen\?documentId=DOC-201$/);
-  await expect(page.getByRole("heading", { name: "Laporan Literasi.pdf" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Laporan Literasi.pdf" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Unduh" })).toBeVisible();
 });
 

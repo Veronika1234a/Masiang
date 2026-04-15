@@ -18,6 +18,9 @@ interface MockAccount {
   operator_name: string | null;
   district: string | null;
   avatar_path: string | null;
+  approval_reviewed_at: string | null;
+  approval_reviewed_by: string | null;
+  approval_rejection_reason: string | null;
   created_at: string;
 }
 
@@ -94,6 +97,7 @@ interface MockState {
   histories: HistoryRow[];
   notifications: NotificationRow[];
   storagePaths: string[];
+  orphanAccounts: MockAccount[];
   counters: {
     notif: number;
     user: number;
@@ -131,6 +135,9 @@ function createAccount(overrides: Partial<MockAccount> & Pick<MockAccount, "id" 
     operator_name: "Operator Sekolah",
     district: "Tana Toraja",
     avatar_path: null,
+    approval_reviewed_at: null,
+    approval_reviewed_by: null,
+    approval_rejection_reason: null,
     created_at: nowIso(),
     ...overrides,
   };
@@ -168,6 +175,7 @@ export function createBaseMockState(): MockState {
     histories: [],
     notifications: [],
     storagePaths: [],
+    orphanAccounts: [],
     counters: {
       notif: 100,
       user: 2,
@@ -276,6 +284,9 @@ function toProfileRow(account: MockAccount) {
     operator_name: account.operator_name,
     district: account.district,
     avatar_path: account.avatar_path,
+    approval_reviewed_at: account.approval_reviewed_at,
+    approval_reviewed_by: account.approval_reviewed_by,
+    approval_rejection_reason: account.approval_rejection_reason,
     created_at: account.created_at,
   };
 }
@@ -344,6 +355,9 @@ export class MockSupabaseBackend {
 
   async install(context: BrowserContext) {
     if (!this.routeInstalled) {
+      await context.route(/\/api\/admin\/auth-health$/, async (route) => {
+        await this.handleAuthHealth(route);
+      });
       await context.route(/\/(auth|rest|storage)\/v1\//, async (route) => {
         const url = new URL(route.request().url());
         if (await this.applyNetworkRules(route, url)) {
@@ -593,6 +607,63 @@ export class MockSupabaseBackend {
     await route.fulfill({ status: 404, body: "" });
   }
 
+  private toOrphanPayload(account: MockAccount) {
+    return {
+      id: account.id,
+      email: account.email,
+      createdAt: account.created_at,
+      role: account.role,
+      schoolName: account.school_name ?? "",
+      npsn: account.npsn ?? "",
+      contactName: account.contact_name ?? "",
+      phone: account.phone ?? "",
+      address: account.address ?? "",
+      repairable: Boolean(account.email && account.school_name && account.npsn),
+    };
+  }
+
+  private async handleAuthHealth(route: Route) {
+    const method = route.request().method();
+
+    if (method === "GET") {
+      await json(route, 200, {
+        orphans: this.state.orphanAccounts.map((account) => this.toOrphanPayload(account)),
+      });
+      return;
+    }
+
+    if (method === "POST") {
+      const body = parseBody(route.request().postData() ?? null) as {
+        action?: "repair" | "delete";
+        userId?: string;
+      } | null;
+      const orphan = this.state.orphanAccounts.find((account) => account.id === body?.userId);
+      if (!body?.action || !body.userId || !orphan) {
+        await json(route, 404, { error: "Akun auth tidak ditemukan." });
+        return;
+      }
+
+      if (body.action === "delete") {
+        this.state.orphanAccounts = this.state.orphanAccounts.filter((account) => account.id !== orphan.id);
+        await json(route, 200, { status: "deleted", userId: orphan.id });
+        return;
+      }
+
+      if (!orphan.email || !orphan.school_name || !orphan.npsn) {
+        await json(route, 422, { error: "Akun yatim tidak memiliki metadata cukup untuk diperbaiki." });
+        return;
+      }
+
+      orphan.approval_status = "pending";
+      this.state.accounts.unshift(orphan);
+      this.state.orphanAccounts = this.state.orphanAccounts.filter((account) => account.id !== orphan.id);
+      await json(route, 200, { status: "repaired", userId: orphan.id });
+      return;
+    }
+
+    await route.fulfill({ status: 405, body: "" });
+  }
+
   private filterRows<T extends object>(rows: T[], url: URL): T[] {
     let filtered = [...rows];
 
@@ -690,6 +761,15 @@ export class MockSupabaseBackend {
       }
       if ("approval_status" in updates) {
         account.approval_status = (updates.approval_status as MockAccount["approval_status"]) ?? "pending";
+      }
+      if ("approval_reviewed_at" in updates) {
+        account.approval_reviewed_at = updates.approval_reviewed_at ? String(updates.approval_reviewed_at) : null;
+      }
+      if ("approval_reviewed_by" in updates) {
+        account.approval_reviewed_by = updates.approval_reviewed_by ? String(updates.approval_reviewed_by) : null;
+      }
+      if ("approval_rejection_reason" in updates) {
+        account.approval_rejection_reason = updates.approval_rejection_reason ? String(updates.approval_rejection_reason) : null;
       }
 
       await json(route, 200, []);

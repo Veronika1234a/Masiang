@@ -19,6 +19,19 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function getClientIp(request: Request) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0]?.trim() || "unknown";
+  }
+
+  return (
+    request.headers.get("x-real-ip") ??
+    request.headers.get("cf-connecting-ip") ??
+    "unknown"
+  );
+}
+
 export async function POST(request: Request) {
   let body: RegisterSchoolRequest;
 
@@ -56,6 +69,51 @@ export async function POST(request: Request) {
   try {
     adminClient = createAdminClient();
   } catch {
+    return badRequest("Registrasi server belum siap. Hubungi admin sistem.", 500);
+  }
+
+  const ipAddress = getClientIp(request);
+  const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+  const [ipAttempts, emailAttempts, npsnAttempts] = await Promise.all([
+    adminClient
+      .from("registration_rate_limits")
+      .select("id", { count: "exact", head: true })
+      .eq("ip_address", ipAddress)
+      .gte("created_at", windowStart),
+    adminClient
+      .from("registration_rate_limits")
+      .select("id", { count: "exact", head: true })
+      .eq("email", email)
+      .gte("created_at", windowStart),
+    adminClient
+      .from("registration_rate_limits")
+      .select("id", { count: "exact", head: true })
+      .eq("npsn", npsn)
+      .gte("created_at", windowStart),
+  ]);
+
+  if (ipAttempts.error || emailAttempts.error || npsnAttempts.error) {
+    return badRequest("Registrasi server belum siap. Hubungi admin sistem.", 500);
+  }
+
+  if (
+    (ipAttempts.count ?? 0) >= 10 ||
+    (emailAttempts.count ?? 0) >= 3 ||
+    (npsnAttempts.count ?? 0) >= 3
+  ) {
+    return badRequest("Terlalu banyak percobaan registrasi. Coba lagi nanti.", 429);
+  }
+
+  const { error: rateLimitInsertError } = await adminClient
+    .from("registration_rate_limits")
+    .insert({
+      ip_address: ipAddress,
+      email,
+      npsn,
+    });
+
+  if (rateLimitInsertError) {
     return badRequest("Registrasi server belum siap. Hubungi admin sistem.", 500);
   }
 

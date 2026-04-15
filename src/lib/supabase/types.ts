@@ -25,6 +25,9 @@ export interface Database {
           operator_name: string | null;
           district: string | null;
           avatar_path: string | null;
+          approval_reviewed_at: string | null;
+          approval_reviewed_by: string | null;
+          approval_rejection_reason: string | null;
           created_at: string;
         };
         Insert: {
@@ -42,6 +45,9 @@ export interface Database {
           operator_name?: string | null;
           district?: string | null;
           avatar_path?: string | null;
+          approval_reviewed_at?: string | null;
+          approval_reviewed_by?: string | null;
+          approval_rejection_reason?: string | null;
           created_at?: string;
         };
         Update: {
@@ -59,6 +65,33 @@ export interface Database {
           operator_name?: string | null;
           district?: string | null;
           avatar_path?: string | null;
+          approval_reviewed_at?: string | null;
+          approval_reviewed_by?: string | null;
+          approval_rejection_reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      registration_rate_limits: {
+        Row: {
+          id: number;
+          ip_address: string;
+          email: string;
+          npsn: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          ip_address: string;
+          email: string;
+          npsn: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          ip_address?: string;
+          email?: string;
+          npsn?: string;
           created_at?: string;
         };
         Relationships: [];
