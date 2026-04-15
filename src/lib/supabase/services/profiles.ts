@@ -19,6 +19,14 @@ export interface RegisteredSchoolProfile {
   approvalRejectionReason?: string;
 }
 
+function isLocalE2EMode() {
+  if (process.env.NEXT_PUBLIC_E2E_TEST_MODE !== "1" || typeof window === "undefined") {
+    return false;
+  }
+
+  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+}
+
 function rowToSchoolProfile(row: ProfileRow): SchoolProfile {
   return {
     schoolName: row.school_name ?? "",
@@ -125,6 +133,27 @@ export async function updateSchoolApprovalStatus(
   reviewerId: string,
   rejectionReason?: string,
 ): Promise<void> {
+  if (!isLocalE2EMode()) {
+    const response = await fetch("/api/admin/schools/approval", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        schoolId: userId,
+        approvalStatus,
+        rejectionReason,
+      }),
+    });
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+
+    if (!response.ok) {
+      throw new Error(body?.error ?? "Gagal memperbarui status akun sekolah.");
+    }
+
+    return;
+  }
+
   const supabase = createClient();
   const { data, error } = await supabase
     .from("profiles")
