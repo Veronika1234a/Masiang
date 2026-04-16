@@ -4,9 +4,16 @@ import { buildProtectedRedirectTarget } from "@/lib/userFlow";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+  const isLocalRequest =
+    request.nextUrl.hostname === "localhost" ||
+    request.nextUrl.hostname === "127.0.0.1";
   const e2eBypassEnabled =
-    process.env.E2E_TEST_MODE === "1" ||
-    request.cookies.get("masiang-e2e-bypass")?.value === "1";
+    process.env.NODE_ENV !== "production" &&
+    isLocalRequest &&
+    (
+      process.env.E2E_TEST_MODE === "1" ||
+      request.cookies.get("masiang-e2e-bypass")?.value === "1"
+    );
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

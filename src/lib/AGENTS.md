@@ -9,10 +9,10 @@ This directory owns all shared state, auth logic, data orchestration, and Supaba
 |------|---------------|
 | `AuthContext.tsx` | Auth state, login/register/logout, role resolution, registered school list |
 | `DashboardContext.tsx` | Central dashboard state: bookings, docs, histories, profile, notifications, toasts, and all CRUD actions |
-| `userDashboardData.ts` | Domain types, constants, utilities, seed data |
+| `userDashboardData.ts` | Domain types, constants, utilities |
 | `userFlow.ts` | Redirect helpers, notification routing, school document matching for admin |
 | `bookingPrint.ts` | Print utilities for booking records |
-| `middleware.ts` | Re-exports `updateSession` from `src/lib/supabase/middleware.ts` |
+| `supabase/middleware.ts` | Session refresh and protected-route role guard used by `src/proxy.ts` |
 | `supabase/` | Supabase clients, types, and domain service modules |
 
 ## AuthContext
@@ -22,11 +22,10 @@ This directory owns all shared state, auth logic, data orchestration, and Supaba
 **State:** `user` (AuthUser | null), `isAuthenticated`, `loading`, `registeredSchools`
 
 **Key functions:**
-- `login(identity, password)` → Supabase signIn, fetch profile, resolve role, set user
-- `register(payload)` → Supabase signUp with metadata (role="school", school_name, etc.)
+- `login(identity, password)` → Server login API, validate role/approval, set user
+- `register(payload)` → Server register API, create pending school account
 - `logout()` → Supabase signOut, clear state
-- `resendSignupVerification(email)` → Resend Supabase signup verification email
-- `refreshRegisteredSchools()` → Fetch all profiles with role="school"
+- `refreshSchools()` → Fetch all profiles with role="school"
 
 **Called by:** `AppProviders`, `AuthGuard`, login page, registration page, admin sekolah page.
 
@@ -68,9 +67,7 @@ This directory owns all shared state, auth logic, data orchestration, and Supaba
 
 **Utilities:** `formatLongDateID`, `formatMediumDateID`, `formatShortDateID`, `getDateDiffFromToday`, `getBookingReminder`, `getBookingSummary`, `getNextBooking`, `getTodayISO`, `getTomorrowISO`, `normalizeBookingSession`, `getFormattedNow`, `getFormattedToday`
 
-**ID generators:** `generateBookingId`, `generateDocId`, `generateHistoryId`, `generateNotifId` (monotonic counters, not DB sequences)
-
-**Seed data:** `getBookingSeed`, `getRiwayatSeed`, `getUserDocumentSeed`, `getSchoolProfile`, `getNotificationSeed`
+Runtime demo/seed exports have been removed from this module. Test fixtures live under `tests/e2e/support`.
 
 ## userFlow.ts
 
@@ -87,14 +84,14 @@ This directory owns all shared state, auth logic, data orchestration, and Supaba
 |------|---------|
 | `client.ts` | Browser Supabase client factory |
 | `server.ts` | Server Supabase client with cookie bridging |
-| `middleware.ts` | Session refresh for Next.js middleware |
+| `middleware.ts` | Session refresh for Next.js proxy |
 | `types.ts` | Generated `Database` types from Supabase |
 
 ### Services
 
 | Service | Functions | DB Table |
 |---------|-----------|----------|
-| `auth.ts` | `signIn`, `signUp`, `resendSignupVerification`, `signOut`, `changePassword`, `updateUserMetadata`, `getSession`, `getProfile`, `onAuthStateChange` | auth.users, profiles |
+| `auth.ts` | `signIn`, `signUp`, `signOut`, `changePassword`, `updateUserMetadata`, `updateEmail`, `getSession`, `getProfile`, `onAuthStateChange` | auth.users, profiles |
 | `profiles.ts` | `fetchProfile`, `updateProfile`, `fetchAllSchoolProfiles`, `fetchAdminUserIds` | profiles |
 | `bookings.ts` | `fetchBookings`, `insertBooking`, `updateBooking`, `checkAvailability` | bookings |
 | `documents.ts` | `fetchDocuments`, `insertDocument`, `updateDocument`, `deleteDocument` | documents |

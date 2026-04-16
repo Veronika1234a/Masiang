@@ -1,7 +1,7 @@
 # APP ROUTER MEMORY
 
 ## Overview
-All routes live under `src/app/` following Next.js 16 App Router conventions. Two protected areas (`/dashboard/**`, `/dashboard-admin/**`) are guarded by both middleware (`src/middleware.ts`) and `AuthGuard` in their respective layout files.
+All routes live under `src/app/` following Next.js 16 App Router conventions. Two protected areas (`/dashboard/**`, `/dashboard-admin/**`) are guarded by both proxy (`src/proxy.ts`) and `AuthGuard` in their respective layout files.
 
 ## Route Hierarchy
 
@@ -36,22 +36,22 @@ All routes live under `src/app/` following Next.js 16 App Router conventions. Tw
 | `/dashboard/**` | `src/app/dashboard/layout.tsx` | `DashboardShell` | Middleware + `AuthGuard(requiredRole="school")` |
 | `/dashboard-admin/**` | `src/app/dashboard-admin/layout.tsx` | `AdminShell` | Middleware + `AuthGuard(requiredRole="admin")` |
 
-## Middleware Behavior
+## Proxy Behavior
 
-- `src/middleware.ts` delegates to `src/lib/supabase/middleware.ts:updateSession`.
+- `src/proxy.ts` delegates to `src/lib/supabase/middleware.ts:updateSession`.
 - Refreshes Supabase session cookies on every request.
 - For `/dashboard/**` and `/dashboard-admin/**`:
   - No user → redirect to `/login` with `?redirectTo=` parameter.
   - Wrong role → redirect to correct dashboard or `/login`.
-  - `E2E_TEST_MODE=1` or `masiang-e2e-bypass` cookie → bypass auth check.
+  - `E2E_TEST_MODE=1` or `masiang-e2e-bypass` cookie bypass auth only for local non-production requests.
 - Public routes pass through without redirect.
 
 ## Auth Flow
 
-1. Registration at `/daftar-sekolah` → `useAuth().register()` → Supabase `signUp` with metadata → DB trigger creates `profiles` row.
-2. Login at `/login` → `useAuth().login()` → Supabase `signInWithPassword` → `AuthContext` fetches profile → resolves role → redirects via `resolvePostLoginRedirect`.
-3. Post-login redirect: school → `/dashboard/ringkasan`, admin → `/dashboard-admin`.
-4. Logout → `useAuth().logout()` → Supabase `signOut` → `window.location.replace("/login")`.
+1. Registration at `/daftar-sekolah` uses `/api/register-school` and creates a Supabase auth user plus `profiles` row with `approval_status = pending`.
+2. Login at `/login` uses `/api/auth/login`, validates role and approval state, and blocks pending/rejected schools.
+3. Post-login redirect: approved school -> `/dashboard/ringkasan`, admin -> `/dashboard-admin`.
+4. Logout uses Supabase `signOut`; shells redirect to `/login` only after sign-out succeeds.
 
 ## Data Flow Per Route
 
@@ -64,10 +64,11 @@ All dashboard routes consume `useDashboard()` from `DashboardContext`, which loa
 - `toasts` (ToastItem[])
 - Actions: `createBooking`, `cancelBooking`, `approveBooking`, `rejectBooking`, `startSession`, `confirmBookingDone`, `rateBooking`, `uploadDocument`, `deleteDocument`, `replaceDocument`, `reviewDocument`, `updateProfile`, `addSupervisorNotes`, `markNotificationRead`, `markAllNotificationsRead`, `addToast`, `removeToast`.
 
-## Seed Data
+## Data Source
 
-- `src/lib/userDashboardData.ts` exports seed functions: `getBookingSeed()`, `getRiwayatSeed()`, `getUserDocumentSeed()`, `getSchoolProfile()`, `getNotificationSeed()`.
-- Document downloads now resolve from direct links or Supabase Storage signed URLs; no bundled seed download route remains.
+- Dashboard data is loaded from Supabase services through `DashboardContext`.
+- `src/lib/userDashboardData.ts` contains domain types, constants, and utilities only.
+- Document downloads resolve from direct links or Supabase Storage signed URLs.
 
 ## Conventions
 - Dynamic routes use `[bookingId]` and `[historyId]` params.

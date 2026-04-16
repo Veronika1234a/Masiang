@@ -1,4 +1,4 @@
-// ─── Status & Category Types ───
+// Status and category types
 
 export type BookingStatus = "Menunggu" | "Disetujui" | "Dalam Proses" | "Selesai" | "Ditolak" | "Dibatalkan";
 export type TimelineStatus = "done" | "active" | "pending";
@@ -44,8 +44,6 @@ export type NotificationType =
   | "doc_review"
   | "follow_up_reminder"
   | "stage_advanced";
-
-// ─── Interfaces ───
 
 export interface BookingTimelineItem {
   title: string;
@@ -152,8 +150,6 @@ export interface StageProgress {
   laporanPct: number;
 }
 
-// ─── Required Documents Config ───
-
 export const REQUIRED_DOCUMENTS: Record<DocumentStage, string[]> = {
   Melayani: ["Profil Sekolah", "Surat Pengajuan Pendampingan"],
   Adaptif: ["Analisis Kebutuhan Sekolah", "Rencana Aksi"],
@@ -162,8 +158,6 @@ export const REQUIRED_DOCUMENTS: Record<DocumentStage, string[]> = {
 };
 
 export const ALL_STAGES: DocumentStage[] = ["Melayani", "Adaptif", "Pelaksanaan", "Laporan"];
-
-// ─── Utility Functions ───
 
 function toDateInputValue(date: Date): string {
   const year = date.getFullYear();
@@ -253,7 +247,10 @@ export function getBookingSummary(bookings: BookingItem[]) {
 
 export function getNextBooking(bookings: BookingItem[]): BookingItem | null {
   const active = bookings.filter(
-    (b) => b.status === "Disetujui" || b.status === "Dalam Proses" || b.status === "Menunggu",
+    (booking) =>
+      booking.status === "Disetujui" ||
+      booking.status === "Dalam Proses" ||
+      booking.status === "Menunggu",
   );
   const sorted = [...active].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
   return sorted[0] ?? null;
@@ -290,30 +287,6 @@ export function normalizeBookingSession(session: string): string {
   return canonical;
 }
 
-let bookingCounter = 6;
-export function generateBookingId(): string {
-  bookingCounter += 1;
-  return `BK-${String(bookingCounter).padStart(3, "0")}`;
-}
-
-let docCounter = 10;
-export function generateDocId(): string {
-  docCounter += 1;
-  return `DOC-${String(docCounter).padStart(3, "0")}`;
-}
-
-let historyCounter = 5;
-export function generateHistoryId(): string {
-  historyCounter += 1;
-  return `RH-${String(historyCounter).padStart(3, "0")}`;
-}
-
-let notifCounter = 10;
-export function generateNotifId(): string {
-  notifCounter += 1;
-  return `NTF-${String(notifCounter).padStart(3, "0")}`;
-}
-
 export function getFormattedNow(): string {
   return new Intl.DateTimeFormat("id-ID", {
     day: "numeric",
@@ -331,229 +304,4 @@ export function getFormattedToday(): string {
     month: "long",
     year: "numeric",
   }).format(new Date());
-}
-
-// ─── Seed Data ───
-
-export function getBookingSeed(): BookingItem[] {
-  return [
-    {
-      id: "BK-001",
-      school: "UPT SDN 1 Mappak",
-      topic: "Pendampingan Kurikulum Operasional",
-      category: "Pendampingan",
-      dateISO: withDayOffset(0),
-      session: "09.00 - 12.00 WITA",
-      status: "Dalam Proses",
-      goal: "Menyusun kurikulum operasional sekolah sesuai kebijakan terbaru.",
-      notes: "Siapkan dokumen kurikulum tahun sebelumnya.",
-      timeline: [
-        { title: "Pengajuan diterima", note: "Sekolah mengirim permintaan pendampingan", time: "07.30 WITA", status: "done" },
-        { title: "Verifikasi admin", note: "Admin memvalidasi kebutuhan dokumen", time: "08.10 WITA", status: "done" },
-        { title: "Pendampingan sesi berjalan", note: "Sesi aktif bersama pengawas", time: "09.00 WITA", status: "active" },
-        { title: "Unggah laporan", note: "Dokumen hasil sesi diunggah sekolah", time: "Menunggu", status: "pending" },
-      ],
-    },
-    {
-      id: "BK-002",
-      school: "SMP Negeri 2 Makale",
-      topic: "Supervisi Akademik",
-      category: "Supervisi",
-      dateISO: withDayOffset(1),
-      session: "08.30 - 11.30 WITA",
-      status: "Disetujui",
-      goal: "Melakukan supervisi akademik terhadap guru mata pelajaran.",
-      notes: "Koordinasi dengan wakil kepala sekolah bidang kurikulum.",
-      timeline: [
-        { title: "Pengajuan diterima", note: "Data sekolah sudah lengkap", time: "Kemarin", status: "done" },
-        { title: "Verifikasi admin", note: "Pendamping ditetapkan", time: "Kemarin", status: "done" },
-        { title: "Sesi pendampingan", note: "Dijadwalkan besok pagi", time: "Besok, 08.30 WITA", status: "active" },
-        { title: "Unggah laporan", note: "Dibuka setelah sesi selesai", time: "Belum tersedia", status: "pending" },
-      ],
-    },
-    {
-      id: "BK-003",
-      school: "SMK Negeri 1 Rantepao",
-      topic: "Monitoring Implementasi Projek",
-      category: "Workshop",
-      dateISO: withDayOffset(5),
-      session: "10.00 - 13.00 WITA",
-      status: "Menunggu",
-      goal: "Memantau progres implementasi projek P5 di sekolah.",
-      timeline: [
-        { title: "Pengajuan diterima", note: "Pengajuan baru masuk", time: "Hari ini", status: "done" },
-        { title: "Verifikasi admin", note: "Menunggu verifikasi data", time: "Dalam antrean", status: "active" },
-        { title: "Sesi pendampingan", note: "Menunggu persetujuan jadwal", time: "Belum dijadwalkan", status: "pending" },
-        { title: "Unggah laporan", note: "Dibuka setelah sesi berjalan", time: "Belum tersedia", status: "pending" },
-      ],
-    },
-    {
-      id: "BK-004",
-      school: "UPT SDN 1 Mappak",
-      topic: "Evaluasi Program Literasi Sekolah",
-      category: "Training Class",
-      dateISO: withDayOffset(-10),
-      session: "08.00 - 11.00 WITA",
-      status: "Selesai",
-      goal: "Mengevaluasi efektivitas program literasi di sekolah.",
-      rating: 5,
-      feedback: "Sesi sangat membantu, pengawas memberikan rekomendasi yang actionable.",
-      supervisorNotes: "Sekolah menunjukkan progres literasi yang baik. Perlu peningkatan di area menulis kreatif.",
-      timeline: [
-        { title: "Pengajuan diterima", note: "Data lengkap", time: "2 minggu lalu", status: "done" },
-        { title: "Verifikasi admin", note: "Diverifikasi", time: "2 minggu lalu", status: "done" },
-        { title: "Sesi pendampingan", note: "Sesi selesai dilaksanakan", time: "10 hari lalu", status: "done" },
-        { title: "Unggah laporan", note: "Laporan sudah diunggah", time: "9 hari lalu", status: "done" },
-      ],
-    },
-    {
-      id: "BK-005",
-      school: "SMP Negeri 2 Makale",
-      topic: "Pelatihan Penilaian Formatif",
-      category: "Seminar",
-      dateISO: withDayOffset(-15),
-      session: "13.00 - 16.00 WITA",
-      status: "Ditolak",
-      cancelReason: "Jadwal bentrok dengan kegiatan dinas. Silakan ajukan ulang untuk minggu berikutnya.",
-      timeline: [
-        { title: "Pengajuan diterima", note: "Data diterima", time: "3 minggu lalu", status: "done" },
-        { title: "Verifikasi admin", note: "Ditolak — jadwal tidak tersedia", time: "3 minggu lalu", status: "done" },
-        { title: "Sesi pendampingan", note: "Dibatalkan", time: "—", status: "pending" },
-        { title: "Unggah laporan", note: "—", time: "—", status: "pending" },
-      ],
-    },
-  ];
-}
-
-export function getRiwayatSeed(): RiwayatItem[] {
-  return [
-    {
-      id: "RH-001",
-      dateISO: withDayOffset(-6),
-      school: "UPT SDN 1 Mappak",
-      session: "09.00 - 12.00 WITA",
-      title: "Pendampingan Kurikulum Operasional Sekolah",
-      description: "Dokumen asesmen awal, rencana tindak lanjut, dan berita acara telah diunggah.",
-      status: "Selesai",
-      followUpISO: withDayOffset(1),
-      bookingId: "BK-004",
-      supervisorNotes: "Sekolah menunjukkan progres yang baik dalam penyusunan kurikulum. Perlu follow-up terkait implementasi modul ajar.",
-      followUpDone: false,
-      followUpItems: [
-        { id: "FU-001", text: "Finalisasi modul ajar kelas 4-6", done: true },
-        { id: "FU-002", text: "Koordinasi dengan guru mapel untuk jadwal implementasi", done: false },
-        { id: "FU-003", text: "Siapkan instrumen evaluasi kurikulum", done: false },
-      ],
-      documents: [
-        { id: "DOC-RH-001-1", fileName: "Asesmen Awal Kurikulum.pdf", category: "Laporan", uploadedAt: "28 Februari 2026, 10.41 WITA" },
-        { id: "DOC-RH-001-2", fileName: "Rencana Tindak Lanjut.docx", category: "Administrasi", uploadedAt: "28 Februari 2026, 10.45 WITA" },
-        { id: "DOC-RH-001-3", fileName: "Berita Acara Pendampingan.pdf", category: "Lampiran", uploadedAt: "28 Februari 2026, 10.49 WITA" },
-      ],
-    },
-    {
-      id: "RH-002",
-      dateISO: withDayOffset(-12),
-      school: "SMP Negeri 2 Makale",
-      session: "08.30 - 11.30 WITA",
-      title: "Monitoring Implementasi Projek Penguatan Profil Pelajar Pancasila",
-      description: "Rekaman aktivitas kelas dan laporan refleksi guru tersimpan pada sistem.",
-      status: "Laporan",
-      followUpISO: withDayOffset(0),
-      supervisorNotes: "Projek P5 berjalan sesuai rencana. Dokumentasi perlu diperkuat.",
-      followUpDone: false,
-      followUpItems: [
-        { id: "FU-004", text: "Lengkapi dokumentasi foto kegiatan projek", done: false },
-        { id: "FU-005", text: "Upload laporan refleksi guru", done: true },
-      ],
-      documents: [
-        { id: "DOC-RH-002-1", fileName: "Laporan Monitoring Projek.pdf", category: "Laporan", uploadedAt: "22 Februari 2026, 13.12 WITA" },
-        { id: "DOC-RH-002-2", fileName: "Dokumentasi Kegiatan.zip", category: "Lampiran", uploadedAt: "22 Februari 2026, 13.18 WITA" },
-      ],
-    },
-    {
-      id: "RH-003",
-      dateISO: withDayOffset(-20),
-      school: "SMK Negeri 1 Rantepao",
-      session: "10.00 - 13.00 WITA",
-      title: "Pendampingan Supervisi Akademik",
-      description: "Penilaian observasi pembelajaran dan rekomendasi pembinaan tersedia.",
-      status: "Tindak Lanjut",
-      bookingId: "BK-003",
-      supervisorNotes: "Guru-guru memerlukan pelatihan tambahan di bidang asesmen diagnostik.",
-      followUpDone: false,
-      followUpItems: [
-        { id: "FU-006", text: "Jadwalkan pelatihan asesmen diagnostik", done: false },
-        { id: "FU-007", text: "Susun instrumen supervisi lanjutan", done: false },
-        { id: "FU-008", text: "Kirim laporan hasil observasi ke dinas", done: true },
-      ],
-      documents: [
-        { id: "DOC-RH-003-1", fileName: "Instrumen Observasi Pembelajaran.xlsx", category: "Administrasi", uploadedAt: "14 Februari 2026, 15.05 WITA" },
-        { id: "DOC-RH-003-2", fileName: "Rekomendasi Pembinaan Guru.pdf", category: "Laporan", uploadedAt: "14 Februari 2026, 15.11 WITA" },
-      ],
-    },
-  ];
-}
-
-export function getUserDocumentSeed(): SchoolDocument[] {
-  return [];
-}
-
-export function getSchoolProfile(): SchoolProfile {
-  return {
-    schoolName: "UPT SDN 1 Mappak",
-    npsn: "10265538",
-    contactName: "Andi Saputra",
-    educationLevel: "Sekolah Dasar",
-    address: "Jl. Raya Mappak No. 123, Tana Toraja",
-    officialEmail: "sdn1mappak@gmail.com",
-    phone: "(0423) 123456",
-    principalName: "Dra. Siti Rahmawati",
-    operatorName: "Andi Saputra",
-    district: "Tana Toraja",
-  };
-}
-
-export function getNotificationSeed(): Notification[] {
-  return [
-    {
-      id: "NTF-001",
-      title: "Booking Disetujui",
-      message: "Booking BK-002 (Supervisi Akademik) telah disetujui untuk besok.",
-      type: "booking_approved",
-      referenceId: "BK-002",
-      referenceType: "booking",
-      isRead: false,
-      createdAt: withDayOffset(0),
-    },
-    {
-      id: "NTF-002",
-      title: "Tindak Lanjut Besok",
-      message: "Tindak lanjut untuk RH-001 jatuh tempo besok. Pastikan semua item sudah diselesaikan.",
-      type: "follow_up_reminder",
-      referenceId: "RH-001",
-      referenceType: "history",
-      isRead: false,
-      createdAt: withDayOffset(-1),
-    },
-    {
-      id: "NTF-003",
-      title: "Booking Ditolak",
-      message: "Booking BK-005 (Pelatihan Penilaian Formatif) ditolak. Jadwal bentrok dengan kegiatan dinas.",
-      type: "booking_rejected",
-      referenceId: "BK-005",
-      referenceType: "booking",
-      isRead: true,
-      createdAt: withDayOffset(-15),
-    },
-    {
-      id: "NTF-004",
-      title: "Sesi Selesai",
-      message: "Booking BK-004 (Evaluasi Program Literasi) telah selesai. Berikan rating dan feedback.",
-      type: "booking_completed",
-      referenceId: "BK-004",
-      referenceType: "booking",
-      isRead: true,
-      createdAt: withDayOffset(-10),
-    },
-  ];
 }

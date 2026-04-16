@@ -12,7 +12,7 @@ masiang-site/
 │   │   ├── layout.tsx              Root layout: fonts (Fraunces + Plus Jakarta Sans), AppProviders
 │   │   ├── page.tsx                Landing page (hero, steps, about, CTA, footer)
 │   │   ├── globals.css             Tailwind import + CSS custom properties
-│   │   ├── login/page.tsx          Login form with email verification resend
+│   │   ├── login/page.tsx          Supabase login with operator approval checks
 │   │   ├── daftar-sekolah/page.tsx School registration form
 │   │   ├── dashboard/              School dashboard routes (protected by middleware + AuthGuard)
 │   │   │   ├── layout.tsx          School shell: DashboardShell + AuthGuard requiredRole="school"
@@ -45,16 +45,16 @@ masiang-site/
 │   ├── lib/
 │   │   ├── AuthContext.tsx         Auth state: login, register, logout, role, registeredSchools
 │   │   ├── DashboardContext.tsx    Central data: bookings, docs, histories, profile, notifications, toasts
-│   │   ├── userDashboardData.ts    Domain types, constants, utilities, seed data
+│   │   ├── userDashboardData.ts    Domain types, constants, utilities
 │   │   ├── userFlow.ts             Redirect helpers, notification routing, school document matching
-│   │   ├── middleware.ts           Next.js middleware → Supabase session refresh + role guard
+│   │   ├── proxy.ts                Next.js proxy → Supabase session refresh + role guard
 │   │   └── supabase/
 │   │       ├── client.ts           Browser Supabase client factory
 │   │       ├── server.ts           Server Supabase client with cookie bridging
 │   │       ├── middleware.ts       Session refresh for Next.js middleware
 │   │       ├── types.ts            Generated Database types from Supabase
 │   │       └── services/           Domain services: auth, profiles, bookings, documents, histories, notifications, storage
-│   └── middleware.ts               Re-exports updateSession from lib/supabase/middleware
+│   └── proxy.ts                    Re-exports updateSession from lib/supabase/middleware
 ├── public/assets/masiang/          Local visual assets (SVGs, images)
 ├── supabase/schema.sql             Full DB schema: tables, RLS, triggers, sequences, storage
 ├── docs/                           Product scope, implementation memory, UI guidelines
@@ -64,7 +64,7 @@ masiang-site/
 ├── eslint.config.mjs               Next.js core-web-vitals + TypeScript
 ├── next.config.ts                  reactCompiler: true
 ├── postcss.config.mjs              @tailwindcss/postcss
-└── playwright.config.ts            E2E config pointing to ./tests (no tests directory yet)
+└── playwright.config.ts            E2E config pointing to ./tests
 ```
 
 ## Route Map
@@ -72,7 +72,7 @@ masiang-site/
 | Route | File | Access | Shell/Layout | Key Data Consumed |
 |-------|------|--------|-------------|-------------------|
 | `/` | `src/app/page.tsx` | Public | Root layout | None (static landing) |
-| `/login` | `src/app/login/page.tsx` | Public | Root layout | `useAuth()` → login, resendSignupVerification |
+| `/login` | `src/app/login/page.tsx` | Public | Root layout | `useAuth()` → login |
 | `/daftar-sekolah` | `src/app/daftar-sekolah/page.tsx` | Public | Root layout | `useAuth()` → register |
 | `/dashboard` | `src/app/dashboard/page.tsx` | School | Dashboard layout → DashboardShell | Redirects to `/dashboard/ringkasan` |
 | `/dashboard/ringkasan` | `src/app/dashboard/ringkasan/page.tsx` | School | DashboardShell | `useDashboard()` → bookings, documents, histories, profile, progress, unreadCount; `useAuth()` → user |
@@ -89,8 +89,8 @@ masiang-site/
 | `/dashboard-admin/booking/[bookingId]` | `src/app/dashboard-admin/booking/[bookingId]/page.tsx` | Admin | AdminShell | `useDashboard()` → bookings, documents, approveBooking, rejectBooking, startSession, confirmBookingDone, addSupervisorNotes |
 | `/dashboard-admin/dokumen` | `src/app/dashboard-admin/dokumen/page.tsx` | Admin | AdminShell | `useDashboard()` → documents, reviewDocument |
 | `/dashboard-admin/sekolah` | `src/app/dashboard-admin/sekolah/page.tsx` | Admin | AdminShell | `useDashboard()` → bookings, documents, histories; `useAuth()` → registeredSchools |
-| `/dashboard-admin/detail-dokumen` | `src/app/dashboard-admin/detail-dokumen/page.tsx` | Admin | AdminShell | Static/seed document view |
-| `/dashboard-admin/semua-dokumen` | `src/app/dashboard-admin/semua-dokumen/page.tsx` | Admin | AdminShell | Static seed documents |
+| `/dashboard-admin/detail-dokumen` | `src/app/dashboard-admin/detail-dokumen/page.tsx` | Admin | AdminShell | Real document detail view |
+| `/dashboard-admin/semua-dokumen` | `src/app/dashboard-admin/semua-dokumen/page.tsx` | Admin | AdminShell | Real uploaded documents |
 
 ## Where To Look
 
@@ -100,8 +100,8 @@ masiang-site/
 | Public pages | `src/app/page.tsx`, `src/app/login/page.tsx`, `src/app/daftar-sekolah/page.tsx` | Marketing, auth entry, registration |
 | School dashboard | `src/app/dashboard/**/*`, `src/components/dashboard/DashboardShell.tsx` | All school-facing flows |
 | Admin dashboard | `src/app/dashboard-admin/**/*`, `src/components/admin/AdminShell.tsx` | All admin-facing flows |
-| Auth/session | `src/lib/AuthContext.tsx`, `src/components/auth/AuthGuard.tsx`, `src/middleware.ts` | Client auth + server-side role guard |
-| Shared dashboard state | `src/lib/DashboardContext.tsx`, `src/lib/userDashboardData.ts` | Central state orchestration |
+| Auth/session | `src/lib/AuthContext.tsx`, `src/components/auth/AuthGuard.tsx`, `src/proxy.ts` | Client auth + server-side role guard |
+| Shared dashboard state | `src/lib/DashboardContext.tsx`, `src/lib/userDashboardData.ts` | Central state orchestration and domain utilities |
 | Data access layer | `src/lib/supabase/**/*` | Supabase clients, services, types |
 | DB schema + RLS | `supabase/schema.sql` | Tables, policies, triggers, sequences, storage |
 | Product/design intent | `docs/website-purpose.md`, `docs/implementation-memory.md`, `docs/ui-design-guidelines.md`, `memory.md` | Read before changing flows or styling |
@@ -184,7 +184,7 @@ Menunggu → Disetujui → Dalam Proses → Selesai
 - **Supabase access:** Centralized under `src/lib/supabase/`. Do not scatter client creation or direct env reads elsewhere.
 - **Server vs browser:** `createClient()` for browser, `createServerSupabaseClient()` for server components. Middleware uses its own cookie-refreshing client.
 - **Role-based access:** Two layers — middleware does server-side role check; AuthGuard does client-side redirect. Both must agree.
-- **ID generation:** Client-side `nextId()` in DashboardContext uses a monotonic counter. DB has sequences (`next_booking_id()`, etc.) but client does not call them.
+- **ID generation:** Client-side `nextId()` in DashboardContext uses `crypto.randomUUID()` where available, with a timestamp/random fallback. DB sequences remain for seeded/readable IDs.
 - **Language:** UI text is in Bahasa Indonesia. Keep it consistent.
 
 ## Anti-Patterns In This Project
@@ -208,15 +208,15 @@ npm run start     # Production server
 
 ## Testing
 
-- `playwright.config.ts` exists pointing to `./tests` but no test files or `tests/` directory exist yet.
-- An `E2E_TEST_MODE` env var bypasses middleware protection for E2E runs.
-- Treat lint and build as the current reliable validation paths.
+- Playwright tests live under `tests/e2e`; real Supabase validation lives under `tests/real-supabase.validation.test.ts`.
+- `E2E_TEST_MODE=1` and the `masiang-e2e-bypass` cookie are honored only for local non-production requests.
+- Run lint, build, mock E2E, and real Supabase validation before production handoff.
 
 ## Notes
 
 - **React Compiler** is enabled (`reactCompiler: true` in `next.config.ts`). Some `useCallback` dependency arrays may trigger compiler warnings if they don't match inferred deps.
 - **Build on Windows** may OOM with default Node heap. Use `NODE_OPTIONS=--max-old-space-size=4096`.
-- **Middleware** uses `updateSession` from `src/lib/supabase/middleware.ts` which refreshes Supabase cookies and enforces role-based dashboard access.
+- **Proxy** uses `updateSession` from `src/lib/supabase/middleware.ts` which refreshes Supabase cookies and enforces role-based dashboard access.
 - **`memory.md`** is the long-form historical record; prefer it and `docs/` over `README.md` when they disagree about current state.
 - **Fonts:** Fraunces (display headings) + Plus Jakarta Sans (body/interface).
 - **Design language:** Navy/slate palette, gold accent (`#d2ac50`), generous spacing, subtle borders over heavy shadows. See `docs/ui-design-guidelines.md`.

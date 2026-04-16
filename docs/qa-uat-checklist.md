@@ -87,5 +87,5 @@ Suite ini memvalidasi:
 
 ## Remaining Risk
 
-- E2E saat ini memakai mock backend, jadi staging dengan Supabase nyata tetap wajib diuji.
+- E2E lokal memakai backend mock untuk deterministik; production/staging tetap wajib divalidasi dengan Supabase nyata.
 - Trigger, RLS, signed URL storage, dan perilaku concurrency perlu divalidasi di environment nyata.

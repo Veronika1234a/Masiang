@@ -1,11 +1,11 @@
 # MASIANG Implementation Memory
 
-Terakhir diperbarui: 6 Maret 2026
+Terakhir diperbarui: 15 April 2026
 
 ## Ringkasan Status
 Project saat ini sudah memiliki:
 - Landing page marketing
-- Halaman login dan registrasi sekolah (frontend validation)
+- Halaman login dan registrasi sekolah berbasis Supabase + verifikasi operator
 - User dashboard (ringkasan, booking, dokumen, riwayat, profil)
 - Admin dashboard (ringkasan dashboard, semua dokumen, detail dokumen)
 - Shared UI components untuk konsistensi visual
@@ -42,7 +42,8 @@ Project saat ini sudah memiliki:
 2. Login & Registrasi
 - Form state management client-side.
 - Validasi input (required, format email, panjang minimal, format nomor).
-- Status submit mock (success/error) untuk simulasi sebelum API nyata.
+- Registrasi memakai `/api/register-school`, membuat akun Supabase dan profil sekolah berstatus `pending`.
+- Login memakai `/api/auth/login`, memblokir akun sekolah `pending`/`rejected`, dan hanya mengizinkan sekolah `approved`.
 
 3. User Dashboard
 - Sidebar + topbar layout reusable.
@@ -66,11 +67,11 @@ Project saat ini sudah memiliki:
   - Tampilan kartu yang konsisten dengan Booking dan Ringkasan.
 - Halaman dokumen (`/dashboard/dokumen`) dengan:
   - Filter tahap dan pencarian dokumen.
-  - Upload frontend ringan untuk menambah arsip lokal ke daftar.
+  - Upload dokumen/foto/video/link ke Supabase Storage dan tabel `documents`.
   - Tautan langsung ke arsip riwayat bila dokumen terhubung dengan sesi lama.
 - Halaman profil (`/dashboard/profil`) dengan:
   - Ringkasan identitas sekolah.
-  - Mode edit lokal untuk memperbarui data profil di sisi frontend.
+  - Edit profil, update foto profil, update email aman, dan ganti password via Supabase.
   - Statistik booking, riwayat, dan dokumen dalam panel samping.
 - Halaman detail riwayat/dokumen user (`/dashboard/riwayat/[historyId]`) untuk melihat arsip dokumen sesi tanpa masuk ke dashboard admin.
 - Mayoritas halaman user dashboard kini memakai Tailwind utility classes untuk menjaga konsistensi visual baru.
@@ -78,8 +79,9 @@ Project saat ini sudah memiliki:
 
 4. Admin Dashboard
 - Ringkasan admin (KPI + booking masuk).
-- Semua dokumen (daftar tabel dokumen).
-- Detail dokumen (list file + aksi unduh placeholder).
+- Semua dokumen (daftar dokumen dari Supabase).
+- Detail dokumen (review, signed URL download, dan link dokumen).
+- Verifikasi akun sekolah pending/approved/rejected pada halaman sekolah.
 
 5. Typography Pass
 - Proporsi font dashboard user/admin sudah disesuaikan ulang agar lebih seimbang.
@@ -92,29 +94,25 @@ Project saat ini sudah memiliki:
 - Assets: Lokal pada `public/assets/masiang`
 
 ## Keterbatasan Saat Ini
-- Data masih hardcoded/mock.
-- Belum ada API integration untuk auth, booking, dokumen.
-- Belum ada RBAC real (admin vs sekolah) berbasis session/token.
-- Belum ada upload/download dokumen nyata.
-- Belum ada test otomatis (unit/integration/e2e).
+- Browser print report masih basic dan belum menjadi export PDF resmi.
+- Real Supabase validation tetap wajib setelah perubahan migrasi/env/auth.
+- Production readiness bergantung pada Vercel env dan Supabase migration yang sinkron.
 
 ## Backlog Prioritas (Next)
-1. Integrasi autentikasi real
-- JWT/session, proteksi route dashboard, logout real.
+1. Operasional production
+- Pastikan migrasi Supabase, RLS, storage policy, dan Vercel env selalu sinkron sebelum deploy.
+- Jalankan UAT production untuk register -> approval -> login, booking, dokumen, riwayat, dan admin review.
 
-2. Integrasi data dashboard
-- KPI, booking list, riwayat dari backend.
+2. Laporan resmi
+- Ganti browser print report dengan export PDF/report resmi jika dibutuhkan client.
 
-3. Dokumen management real
-- Upload file, versioning, metadata, download, dan audit trail.
-
-4. Improvement UX User Dashboard
+3. Improvement UX User Dashboard
 - Pagination/infinite load untuk list panjang.
 - Notifikasi reminder lintas halaman (misalnya di topbar).
 - Integrasi reminder ke data backend real-time.
 - Samakan `DashboardShell` ke style system Tailwind agar shell dan page content satu bahasa visual.
 
-5. Quality & Operasional
+4. Quality & Operasional
 - Test coverage (form validation, route guard, data table interaction).
 - Observability (error logging, event analytics).
 - A11y audit (keyboard flow, screen reader labels, contrast pass).

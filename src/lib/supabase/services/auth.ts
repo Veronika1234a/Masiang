@@ -230,16 +230,6 @@ export async function signUp(payload: SignUpPayload) {
   return { user: data.user, error: null };
 }
 
-export async function resendSignupVerification(email: string) {
-  const supabase = createClient();
-  const { error } = await supabase.auth.resend({
-    type: "signup",
-    email,
-  });
-
-  return { error: error ? mapAuthErrorMessage(error.message) : null };
-}
-
 export async function signOut() {
   const supabase = createClient();
   const { error } = await supabase.auth.signOut();

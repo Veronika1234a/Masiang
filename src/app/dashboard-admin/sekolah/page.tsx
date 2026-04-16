@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/lib/AuthContext";
 import { useDashboard } from "@/lib/DashboardContext";
@@ -51,19 +51,6 @@ interface SchoolInfo {
   totalHistories: number;
 }
 
-interface OrphanAccount {
-  id: string;
-  email: string;
-  createdAt: string;
-  role: string;
-  schoolName: string;
-  npsn: string;
-  contactName: string;
-  phone: string;
-  address: string;
-  repairable: boolean;
-}
-
 export default function AdminSekolahPage() {
   const { registeredSchools, updateSchoolApprovalStatus } = useAuth();
   const { bookings, documents, histories } = useDashboard();
@@ -72,30 +59,6 @@ export default function AdminSekolahPage() {
   const [rejectTarget, setRejectTarget] = useState<SchoolInfo | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [orphans, setOrphans] = useState<OrphanAccount[]>([]);
-  const [orphanActionKey, setOrphanActionKey] = useState<string | null>(null);
-  const [orphanLoading, setOrphanLoading] = useState(true);
-
-  const fetchAuthHealth = useCallback(async () => {
-    setOrphanLoading(true);
-    try {
-      const response = await fetch("/api/admin/auth-health", { cache: "no-store" });
-      const body = (await response.json().catch(() => null)) as { orphans?: OrphanAccount[]; error?: string } | null;
-      if (!response.ok) {
-        setFeedback(body?.error ?? "Gagal memeriksa akun yatim.");
-        return;
-      }
-      setOrphans(body?.orphans ?? []);
-    } catch {
-      setFeedback("Gagal memeriksa akun yatim.");
-    } finally {
-      setOrphanLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchAuthHealth();
-  }, [fetchAuthHealth]);
 
   const schools = useMemo<SchoolInfo[]>(() => {
     const registeredById = new Map(registeredSchools.map((school) => [school.id, school]));
@@ -226,29 +189,6 @@ export default function AdminSekolahPage() {
     setApprovalActionKey(null);
   };
 
-  const runOrphanAction = async (orphan: OrphanAccount, action: "repair" | "delete") => {
-    setOrphanActionKey(`${orphan.id}:${action}`);
-    setFeedback(null);
-    try {
-      const response = await fetch("/api/admin/auth-health", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, userId: orphan.id }),
-      });
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      if (!response.ok) {
-        setFeedback(body?.error ?? "Gagal memproses akun yatim.");
-        return;
-      }
-      setFeedback(action === "repair" ? "Akun yatim berhasil diperbaiki." : "Akun yatim berhasil dihapus.");
-      await fetchAuthHealth();
-    } catch {
-      setFeedback("Gagal memproses akun yatim.");
-    } finally {
-      setOrphanActionKey(null);
-    }
-  };
-
   const confirmReject = async () => {
     if (!rejectTarget) {
       return;
@@ -299,70 +239,6 @@ export default function AdminSekolahPage() {
           {feedback}
         </div>
       ) : null}
-
-      <section className="rounded-[28px] border border-[#e2dde8] bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6d7998]">
-              Kesehatan Akun
-            </p>
-            <h3 className="mt-2 font-[family-name:var(--font-fraunces)] text-[24px] font-bold text-[#25365f]">
-              Akun auth tanpa profil
-            </h3>
-            <p className="mt-2 max-w-[720px] text-[13px] leading-6 text-[#6d7998]">
-              Gunakan panel ini untuk memperbaiki akun yang sempat gagal registrasi di tengah proses.
-              Akun yang diperbaiki akan kembali berstatus pending.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void fetchAuthHealth()}
-            disabled={orphanLoading}
-            className="rounded-2xl border border-[#d5dbea] bg-[#f9f8fc] px-4 py-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[#4f5b77] hover:bg-[#eef1f8] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {orphanLoading ? "Memeriksa..." : "Refresh"}
-          </button>
-        </div>
-
-        <div className="mt-5 grid gap-3">
-          {orphans.length > 0 ? (
-            orphans.map((orphan) => (
-              <article key={orphan.id} className="flex flex-col gap-3 rounded-2xl border border-[#ece6f1] bg-[#faf9fc] p-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-[13px] font-semibold text-[#25365f]">
-                    {orphan.schoolName || orphan.email || orphan.id}
-                  </p>
-                  <p className="mt-1 text-[12px] leading-6 text-[#6d7998]">
-                    {orphan.email || "Tanpa email"} • {orphan.npsn ? `NPSN ${orphan.npsn}` : "NPSN tidak tersedia"} • {orphan.repairable ? "Bisa diperbaiki" : "Metadata tidak lengkap"}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void runOrphanAction(orphan, "repair")}
-                    disabled={!orphan.repairable || orphanActionKey !== null}
-                    className="rounded-xl border border-[#d08b17] bg-[#ff9409] px-4 py-2.5 text-[12px] font-bold uppercase text-white hover:bg-[#ea8608] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {orphanActionKey === `${orphan.id}:repair` ? "Memproses..." : "Perbaiki"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void runOrphanAction(orphan, "delete")}
-                    disabled={orphanActionKey !== null}
-                    className="rounded-xl border border-[#d9c5c3] bg-[#fff6f5] px-4 py-2.5 text-[12px] font-bold uppercase text-[#9b4b45] hover:bg-[#fdeeed] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {orphanActionKey === `${orphan.id}:delete` ? "Menghapus..." : "Hapus"}
-                  </button>
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="rounded-2xl border border-[#e8f3ee] bg-[#f7fbf8] px-4 py-3 text-[13px] leading-6 text-[#2b5f52]">
-              {orphanLoading ? "Memeriksa akun..." : "Tidak ada akun yatim yang perlu diperbaiki."}
-            </p>
-          )}
-        </div>
-      </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {schools.map((school) => (

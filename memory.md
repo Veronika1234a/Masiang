@@ -224,74 +224,41 @@ Key files:
 
 These are still important and not fully solved:
 
-### A. No Real Persistence
+### A. Production Auth Depends On Supabase Configuration
 
-- Auth state is still in-memory.
-- Registered schools reset on full refresh.
-- Dashboard state also resets on refresh.
+- Register/login now uses Supabase and operator approval, not local demo state.
+- New school accounts are created as `pending` and cannot enter the dashboard until approved.
+- Required Vercel env vars: public Supabase URL/anon key plus server-only service role key.
 
-Meaning:
+### B. Production Data Is Supabase-Backed
 
-- Login session is not persistent.
-- Register/login is still demo-only.
+- Dashboard bookings, documents, histories, profiles, notifications, and school lists load from Supabase.
+- Runtime seed/demo exports have been removed from `src/lib/userDashboardData.ts`.
+- Storage upload/download uses the `school-documents` Supabase Storage bucket.
 
-### B. Data Is Not Yet Scoped Per Logged-In School
+### C. Remaining Operational Risks
 
-This is the biggest remaining logic gap.
-
-Current issue:
-
-- `DashboardContext` still uses one shared `profile`, `bookings`, `documents`, `histories`, and `notifications`.
-- New schools can register and login, but they do not yet get a fully separate dataset.
-- `createBooking()` still uses the current shared `profile.schoolName`, not a real school-specific data store keyed by `schoolId`.
-
-Impact:
-
-- Good enough for demo frontend flow.
-- Not yet correct for real multi-school usage.
-
-### C. School Identity Matching Still Uses School Name
-
-Admin school aggregation currently still depends heavily on `schoolName`.
-
-Better future direction:
-
-- use `schoolId` everywhere
-- store bookings/documents/histories keyed by `schoolId`
-- derive school-specific dashboard data from active logged-in user
-
-### D. File Handling Is Simulated
-
-- No real upload storage
-- No real preview/download for file contents
-- No backend/API validation
-
-### E. Login/Register Pages Still Demo-Oriented
-
-- Demo credentials are visible on login page
-- No redirect guard yet for already-authenticated user on login/register page
-- No forgot password / remember me / session restore
+- Production must keep the latest Supabase migrations applied before deploy.
+- Real Supabase validation is still required after schema/auth changes.
+- Browser print report is functional but not a server-rendered official PDF export.
 
 ## Recommended Next Priorities
 
 If continuing development, this should be the next order:
 
-1. Persist auth and registered schools to `localStorage`
-2. Refactor dashboard state to be per-school, not shared globally
-3. Introduce `schoolId` relationships in booking/document/history models
-4. Sync login user with dashboard profile automatically
-5. Add redirect guard on login/register if already authenticated
-6. Add real backend or Supabase integration
+1. Keep Supabase migrations and Vercel env vars in sync.
+2. Continue production UAT for register -> approval -> login and document upload/download.
+3. Replace browser print with a formal PDF/report export if the client requires official documents.
 
 ## Quick Mental Model
 
 Right now the project is best understood as:
 
-- a strong frontend prototype
-- complete enough for user/admin flow demo
+- a Supabase-backed school/admin platform
+- complete enough for real user/admin UAT
 - visually polished
 - functionally rich
-- but not yet production-correct for multi-user, multi-school persistence
+- production-readiness depends on Supabase schema/env correctness
 
 ## Last Major Work Included
 

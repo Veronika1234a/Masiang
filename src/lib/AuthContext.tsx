@@ -17,7 +17,6 @@ import {
   signUp as supaSignUp,
   signOut as supaSignOut,
   changePassword as supaChangePassword,
-  resendSignupVerification as supaResendSignupVerification,
   getProfile,
   updateUserMetadata as supaUpdateUserMetadata,
   updateEmail as supaUpdateEmail,
@@ -76,7 +75,6 @@ interface AuthContextValue {
   registeredSchools: RegisteredSchool[];
   login(identity: string, password: string): Promise<{ success: boolean; error?: string; redirectTo: string }>;
   register(data: RegisterInput): Promise<{ success: boolean; error?: string }>;
-  resendSignupVerification(email: string): Promise<{ success: boolean; error?: string }>;
   changePassword(currentPassword: string, nextPassword: string): Promise<{ success: boolean; error?: string }>;
   updateAvatarPath(nextPath: string | null): Promise<{ success: boolean; error?: string }>;
   updateEmail(nextEmail: string): Promise<{ success: boolean; error?: string; emailChanged: boolean }>;
@@ -418,18 +416,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const resendSignupVerification = useCallback(
-    async (email: string): Promise<{ success: boolean; error?: string }> => {
-      const result = await supaResendSignupVerification(email.trim());
-      if (result.error) {
-        return { success: false, error: result.error };
-      }
-
-      return { success: true };
-    },
-    [],
-  );
-
   const changePassword = useCallback(
     async (
       currentPassword: string,
@@ -533,7 +519,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       registeredSchools,
       login,
       register,
-      resendSignupVerification,
       changePassword,
       updateAvatarPath,
       updateEmail,
@@ -541,7 +526,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       refreshSchools,
     }),
-    [authLoading, authUser, registeredSchools, login, register, resendSignupVerification, changePassword, updateAvatarPath, updateEmail, updateSchoolApprovalStatus, logout, refreshSchools],
+    [authLoading, authUser, registeredSchools, login, register, changePassword, updateAvatarPath, updateEmail, updateSchoolApprovalStatus, logout, refreshSchools],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
