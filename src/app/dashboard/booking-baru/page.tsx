@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { type ChangeEvent, type FormEvent, Suspense, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, Suspense, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useDashboard } from "@/lib/DashboardContext";
 import {
   BOOKING_SESSION_OPTIONS,
-  getTomorrowISO,
   normalizeBookingSession,
   SERVICE_CATEGORIES,
 } from "@/lib/userDashboardData";
@@ -26,12 +25,21 @@ interface BookingFormValues {
 
 type BookingFormErrors = Partial<Record<BookingFormField, string>>;
 
-function validate(values: BookingFormValues, minDate: string): BookingFormErrors {
+function getBookingYearRange() {
+  const year = new Date().getFullYear();
+  return {
+    start: `${year}-01-01`,
+    end: `${year}-12-31`,
+    label: `Januari sampai Desember ${year}`,
+  };
+}
+
+function validate(values: BookingFormValues, dateRange = getBookingYearRange()): BookingFormErrors {
   const errors: BookingFormErrors = {};
   if (!values.topic.trim() || values.topic.trim().length < 5) errors.topic = "Topik minimal 5 karakter.";
   if (!values.category) errors.category = "Kategori layanan wajib dipilih.";
   if (!values.date) errors.date = "Tanggal wajib diisi.";
-  else if (values.date < minDate) errors.date = "Tanggal harus minimal besok (H+1).";
+  else if (values.date < dateRange.start || values.date > dateRange.end) errors.date = `Tanggal harus berada dalam rentang ${dateRange.label}.`;
   if (!values.session.trim()) errors.session = "Sesi waktu wajib dipilih.";
   else if (!(BOOKING_SESSION_OPTIONS as readonly string[]).includes(normalizeBookingSession(values.session))) errors.session = "Gunakan pilihan sesi yang tersedia.";
   if (!values.goal.trim() || values.goal.trim().length < 10) errors.goal = "Tujuan minimal 10 karakter.";
@@ -57,7 +65,7 @@ function BookingBaruContent() {
   const { createBooking, checkAvailability, addToast } = useDashboard();
   const searchParams = useSearchParams();
   const prefilledDate = searchParams.get("date") ?? "";
-  const minDate = getTomorrowISO();
+  const bookingDateRange = getBookingYearRange();
 
   const [values, setValues] = useState<BookingFormValues>({
     topic: "",
@@ -79,12 +87,10 @@ function BookingBaruContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const availabilityRequestIdRef = useRef(0);
 
-  const isFormValid = useMemo(() => Object.keys(validate(values, minDate)).length === 0 && !availabilityWarning, [values, minDate, availabilityWarning]);
-
   const onChange = (field: BookingFormField) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const nextValues = { ...values, [field]: event.target.value };
     setValues(nextValues);
-    if (touched[field]) setErrors(validate(nextValues, minDate));
+    if (touched[field]) setErrors(validate(nextValues));
 
     if (field === "date" || field === "session") {
       const d = field === "date" ? event.target.value : nextValues.date;
@@ -106,15 +112,22 @@ function BookingBaruContent() {
 
   const onBlur = (field: BookingFormField) => () => {
     setTouched((c) => ({ ...c, [field]: true }));
-    setErrors(validate(values, minDate));
+    setErrors(validate(values));
   };
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const currentErrors = validate(values, minDate);
+    const currentErrors = validate(values);
     setErrors(currentErrors);
     setTouched({ topic: true, category: true, date: true, session: true, goal: true, notes: true });
-    if (Object.keys(currentErrors).length > 0) return;
+    if (Object.keys(currentErrors).length > 0) {
+      setSubmitError("Periksa kembali data yang bertanda merah sebelum mengirim booking.");
+      return;
+    }
+    if (availabilityWarning) {
+      setSubmitError(availabilityWarning);
+      return;
+    }
     setSubmitError("");
     setConfirmOpen(true);
   };
@@ -171,7 +184,7 @@ function BookingBaruContent() {
             Ajukan Sesi Pendampingan
           </h1>
           <p className="mt-2 max-w-[540px] text-[14px] leading-[1.6] text-[#4f5b77]">
-            Isi kebutuhan pendampingan dengan lengkap. Setelah dikirim, sesi akan masuk ke kalender dan diverifikasi oleh admin.
+            Isi kebutuhan pendampingan dengan lengkap. Tanggal booking aktif untuk {bookingDateRange.label}, termasuk kegiatan yang sudah terlaksana.
           </p>
         </div>
 
@@ -217,7 +230,10 @@ function BookingBaruContent() {
               <div className="grid gap-5 md:grid-cols-2">
                 <label className="grid gap-2">
                   <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#6d7998]">Tanggal</span>
-                  <input type="date" value={values.date} min={minDate} onChange={onChange("date")} onBlur={onBlur("date")} aria-invalid={Boolean(touched.date && errors.date)} className="min-h-11 rounded-xl border border-[#d7deef] bg-white px-3 text-[14px] text-[#313f61] outline-none transition-colors focus:border-[#b7c4df]" />
+                  <input type="date" value={values.date} min={bookingDateRange.start} max={bookingDateRange.end} onChange={onChange("date")} onBlur={onBlur("date")} aria-invalid={Boolean(touched.date && errors.date)} className="min-h-11 rounded-xl border border-[#d7deef] bg-white px-3 text-[14px] text-[#313f61] outline-none transition-colors focus:border-[#b7c4df]" />
+                  <small className="text-[12px] leading-[1.5] text-[#6d7998]">
+                    Pilih tanggal kegiatan sebenarnya dalam rentang {bookingDateRange.label}.
+                  </small>
                   {touched.date && errors.date && <small className="text-[12px] font-bold text-[#a13636]">{errors.date}</small>}
                 </label>
                 <label className="grid gap-2">
@@ -252,7 +268,7 @@ function BookingBaruContent() {
 
               <div className="flex flex-col gap-3 border-t border-[#e1dce8] pt-5 sm:flex-row sm:justify-end">
                 <Button href="/dashboard/booking" variant="outline" size="md">Batal</Button>
-                <Button type="submit" variant="primary" size="md" disabled={!isFormValid}>Kirim Booking</Button>
+                <Button type="submit" variant="primary" size="md">Kirim Booking</Button>
               </div>
             </form>
           </section>

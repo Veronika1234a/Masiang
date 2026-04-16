@@ -7,7 +7,7 @@ import type {
   RiwayatItem,
   SchoolDocument,
 } from "../src/lib/userDashboardData";
-import { normalizeBookingSession } from "../src/lib/userDashboardData";
+import { getNextBooking, normalizeBookingSession } from "../src/lib/userDashboardData";
 import {
   buildProtectedRedirectTarget,
   getNotificationHref,
@@ -287,6 +287,43 @@ test("normalizeBookingSession normalizes free-text slot input", () => {
     normalizeBookingSession(" 08.30 - 11.30 WITA "),
     "08.30 - 11.30 WITA",
   );
+});
+
+test("getNextBooking ignores active bookings from past dates", () => {
+  const toDateInputValue = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+  const withOffset = (days: number) => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + days);
+    return toDateInputValue(date);
+  };
+
+  const pastBooking: BookingItem = {
+    id: "BK-PAST",
+    school: "UPT SDN 1 Mappak",
+    topic: "Kegiatan Lama",
+    dateISO: withOffset(-30),
+    session: "09.00 - 12.00 WITA",
+    status: "Menunggu",
+    timeline: [],
+  };
+  const futureBooking: BookingItem = {
+    id: "BK-FUTURE",
+    school: "UPT SDN 1 Mappak",
+    topic: "Kegiatan Mendatang",
+    dateISO: withOffset(7),
+    session: "09.00 - 12.00 WITA",
+    status: "Disetujui",
+    timeline: [],
+  };
+
+  assert.equal(getNextBooking([pastBooking, futureBooking])?.id, "BK-FUTURE");
+  assert.equal(getNextBooking([pastBooking]), null);
 });
 
 test("isDirectDownloadPath distinguishes direct links from storage object paths", () => {

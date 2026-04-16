@@ -246,11 +246,13 @@ export function getBookingSummary(bookings: BookingItem[]) {
 }
 
 export function getNextBooking(bookings: BookingItem[]): BookingItem | null {
+  const today = getTodayISO();
   const active = bookings.filter(
     (booking) =>
-      booking.status === "Disetujui" ||
-      booking.status === "Dalam Proses" ||
-      booking.status === "Menunggu",
+      booking.dateISO >= today &&
+      (booking.status === "Disetujui" ||
+        booking.status === "Dalam Proses" ||
+        booking.status === "Menunggu"),
   );
   const sorted = [...active].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
   return sorted[0] ?? null;
