@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
+import { openBookingPrintReport } from "@/lib/bookingPrint";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/lib/AuthContext";
 import { useDashboard } from "@/lib/DashboardContext";
@@ -53,7 +55,7 @@ interface SchoolInfo {
 
 export default function AdminSekolahPage() {
   const { registeredSchools, updateSchoolApprovalStatus } = useAuth();
-  const { bookings, documents, histories } = useDashboard();
+  const { bookings, documents, histories, addToast } = useDashboard();
   const [detailSchool, setDetailSchool] = useState<string | null>(null);
   const [approvalActionKey, setApprovalActionKey] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<SchoolInfo | null>(null);
@@ -202,6 +204,24 @@ export default function AdminSekolahPage() {
     setRejectReason("");
   };
 
+  const openBookingReport = (bookingId: string) => {
+    const booking = bookings.find((item) => item.id === bookingId);
+    if (!booking) {
+      addToast("Booking tidak ditemukan untuk dicetak.", "error");
+      return;
+    }
+
+    const opened = openBookingPrintReport({
+      booking,
+      documents: documents.filter((document) => document.bookingId === bookingId),
+      history: histories.find((history) => history.bookingId === bookingId) ?? null,
+    });
+
+    if (!opened) {
+      addToast("Popup cetak diblokir browser. Izinkan popup lalu coba lagi.", "error");
+    }
+  };
+
   return (
     <div className="space-y-6 text-[#25365f]">
       <header className="space-y-2">
@@ -264,7 +284,7 @@ export default function AdminSekolahPage() {
                   {school.name}
                 </h3>
                 <p className="mt-2 text-[13px] leading-6 text-[#6d7998]">
-                  {school.email ?? "Belum ada email terdaftar."}
+                  Login sekolah memakai NPSN dan password.
                 </p>
               </div>
 
@@ -384,8 +404,8 @@ export default function AdminSekolahPage() {
                     </span>
                   </p>
                   <p className="text-[13px] leading-6 text-[#5d6780]">
-                    Email
-                    <span className="mt-1 block font-semibold text-[#25365f]">{detailSchoolData.registered.email}</span>
+                    Akses Login
+                    <span className="mt-1 block font-semibold text-[#25365f]">NPSN sekolah + password</span>
                   </p>
                   <p className="text-[13px] leading-6 text-[#5d6780]">
                     Direview
@@ -459,9 +479,24 @@ export default function AdminSekolahPage() {
                           {booking.id} • {formatShortDateID(booking.dateISO)} • {booking.category ?? "-"}
                         </p>
                       </div>
-                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${getStatusClasses(booking.status)}`}>
-                        {booking.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${getStatusClasses(booking.status)}`}>
+                          {booking.status}
+                        </span>
+                        <Link
+                          href={`/dashboard-admin/booking/${booking.id}`}
+                          className="rounded-xl border border-[#d8deeb] bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#4f5b77] hover:bg-[#eef1f8]"
+                        >
+                          Detail
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => openBookingReport(booking.id)}
+                          className="rounded-xl border border-[#ffb660] bg-[#fff3e2] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#d96f05] hover:bg-[#ffe7c9]"
+                        >
+                          Cetak
+                        </button>
+                      </div>
                     </div>
                   ))
                 ) : (
@@ -482,6 +517,23 @@ export default function AdminSekolahPage() {
                       <p className="mt-1 text-[12px] leading-6 text-[#6d7998]">
                         {history.id} • {formatShortDateID(history.dateISO)} • {history.status}
                       </p>
+                      {history.bookingId ? (
+                        <div className="mt-2 flex gap-2">
+                          <Link
+                            href={`/dashboard-admin/booking/${history.bookingId}`}
+                            className="rounded-xl border border-[#d8deeb] bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#4f5b77] hover:bg-[#eef1f8]"
+                          >
+                            Buka Booking
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => openBookingReport(history.bookingId!)}
+                            className="rounded-xl border border-[#ffb660] bg-[#fff3e2] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#d96f05] hover:bg-[#ffe7c9]"
+                          >
+                            Cetak Laporan
+                          </button>
+                        </div>
+                      ) : null}
                       {history.supervisorNotes ? (
                         <p className="mt-2 text-[12px] leading-6 text-[#35557c]">
                           Catatan: {history.supervisorNotes}
@@ -507,9 +559,17 @@ export default function AdminSekolahPage() {
                           {document.id} • {document.stage} • {document.uploadedAt}
                         </p>
                       </div>
-                      <span className="rounded-full bg-[#eef1f8] px-3 py-1 text-[10px] font-bold text-[#4f5b77]">
-                        {document.reviewStatus ?? "Menunggu Review"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-[#eef1f8] px-3 py-1 text-[10px] font-bold text-[#4f5b77]">
+                          {document.reviewStatus ?? "Menunggu Review"}
+                        </span>
+                        <Link
+                          href={`/dashboard-admin/detail-dokumen?documentId=${encodeURIComponent(document.id)}`}
+                          className="rounded-xl border border-[#d8deeb] bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#4f5b77] hover:bg-[#eef1f8]"
+                        >
+                          Buka
+                        </Link>
+                      </div>
                     </div>
                   ))}
                 </div>

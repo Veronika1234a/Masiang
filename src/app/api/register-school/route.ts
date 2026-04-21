@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { buildSchoolInternalEmail, isValidSchoolRegistrationNpsn } from "@/lib/authIdentity";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 interface RegisterSchoolRequest {
-  email?: string;
   password?: string;
   schoolName?: string;
   npsn?: string;
@@ -13,10 +13,6 @@ interface RegisterSchoolRequest {
 
 function badRequest(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
-}
-
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function getClientIp(request: Request) {
@@ -41,7 +37,6 @@ export async function POST(request: Request) {
     return badRequest("Payload registrasi tidak valid.");
   }
 
-  const email = body.email?.trim().toLowerCase();
   const password = body.password ?? "";
   const schoolName = body.schoolName?.trim();
   const npsn = body.npsn?.trim();
@@ -49,21 +44,19 @@ export async function POST(request: Request) {
   const phone = body.phone?.trim();
   const address = body.address?.trim();
 
-  if (!email || !password || !schoolName || !npsn || !contactName || !phone || !address) {
+  if (!password || !schoolName || !npsn || !contactName || !phone || !address) {
     return badRequest("Data registrasi belum lengkap.");
   }
 
-  if (!isValidEmail(email)) {
-    return badRequest("Format email tidak valid.");
-  }
-
-  if (!/^\d{8}$/.test(npsn)) {
+  if (!isValidSchoolRegistrationNpsn(npsn)) {
     return badRequest("NPSN harus 8 digit angka.");
   }
 
   if (password.length < 8) {
     return badRequest("Password minimal 8 karakter.");
   }
+
+  const loginEmail = buildSchoolInternalEmail(npsn);
 
   let adminClient;
   try {
@@ -84,7 +77,7 @@ export async function POST(request: Request) {
     adminClient
       .from("registration_rate_limits")
       .select("id", { count: "exact", head: true })
-      .eq("email", email)
+      .eq("email", loginEmail)
       .gte("created_at", windowStart),
     adminClient
       .from("registration_rate_limits")
@@ -107,9 +100,9 @@ export async function POST(request: Request) {
 
   const { error: rateLimitInsertError } = await adminClient
     .from("registration_rate_limits")
-    .insert({
+      .insert({
       ip_address: ipAddress,
-      email,
+      email: loginEmail,
       npsn,
     });
 
@@ -120,15 +113,15 @@ export async function POST(request: Request) {
   const { data: existingEmailProfile, error: existingEmailError } = await adminClient
     .from("profiles")
     .select("id")
-    .eq("email", email)
+    .eq("email", loginEmail)
     .maybeSingle();
 
   if (existingEmailError) {
-    return badRequest("Gagal memvalidasi email sekolah. Coba lagi.", 500);
+    return badRequest("Gagal memvalidasi akun sekolah. Coba lagi.", 500);
   }
 
   if (existingEmailProfile) {
-    return badRequest("Email ini sudah terdaftar. Silakan login atau hubungi operator sekolah.", 409);
+    return badRequest("NPSN ini sudah terdaftar. Silakan login atau hubungi operator sekolah.", 409);
   }
 
   const { data: existingNpsnProfile, error: existingNpsnError } = await adminClient
@@ -146,7 +139,7 @@ export async function POST(request: Request) {
   }
 
   const { data, error } = await adminClient.auth.admin.createUser({
-    email,
+    email: loginEmail,
     password,
     email_confirm: true,
     app_metadata: {
@@ -167,11 +160,11 @@ export async function POST(request: Request) {
   if (error) {
     const normalized = error.message.toLowerCase();
     if (normalized.includes("already") || normalized.includes("registered")) {
-      return badRequest("Email ini sudah terdaftar. Silakan login atau hubungi operator sekolah.", 409);
+      return badRequest("NPSN ini sudah terdaftar. Silakan login atau hubungi operator sekolah.", 409);
     }
 
     if (normalized.includes("database error") || error.code === "unexpected_failure") {
-      return badRequest("Registrasi gagal karena data sekolah bentrok atau database belum sinkron. Periksa email/NPSN atau hubungi admin sistem.", 500);
+      return badRequest("Registrasi gagal karena data sekolah bentrok atau database belum sinkron. Periksa NPSN atau hubungi admin sistem.", 500);
     }
 
     return badRequest(error.message || "Registrasi gagal.", 500);
@@ -203,7 +196,7 @@ export async function POST(request: Request) {
         school_name: schoolName,
         npsn,
         contact_name: contactName,
-        email,
+        email: loginEmail,
         phone,
         address,
       });
@@ -217,7 +210,7 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       userId,
-      email,
+      loginIdentity: npsn,
       status: "pending",
     },
     { status: 201 },

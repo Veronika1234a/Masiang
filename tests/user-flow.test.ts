@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {
+  buildSchoolInternalEmail,
+  isEmailIdentity,
+  isNpsnIdentity,
+} from "../src/lib/authIdentity";
 import { isDirectDownloadPath } from "../src/lib/supabase/services/storage";
 import type {
   BookingItem,
@@ -40,6 +45,13 @@ test("resolvePostLoginRedirect only accepts safe internal paths", () => {
     resolvePostLoginRedirect("//evil.example", "/dashboard/ringkasan"),
     "/dashboard/ringkasan",
   );
+});
+
+test("school auth identity supports NPSN-first login and internal email mapping", () => {
+  assert.equal(isNpsnIdentity("10265538"), true);
+  assert.equal(isEmailIdentity("admin@masiang.id"), true);
+  assert.equal(isEmailIdentity("10265538"), false);
+  assert.equal(buildSchoolInternalEmail("10265538"), "npsn-10265538@school.masiang.local");
 });
 
 test("getNotificationHref maps notifications to actionable destinations", () => {

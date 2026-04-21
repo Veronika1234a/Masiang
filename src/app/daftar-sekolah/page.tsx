@@ -9,7 +9,6 @@ type SchoolField =
   | "schoolName"
   | "npsn"
   | "contactName"
-  | "email"
   | "phone"
   | "address"
   | "password"
@@ -19,7 +18,6 @@ export interface SchoolRegistrationFormValues {
   schoolName: string;
   npsn: string;
   contactName: string;
-  email: string;
   phone: string;
   address: string;
   password: string;
@@ -33,14 +31,11 @@ const initialValues: SchoolRegistrationFormValues = {
   schoolName: "",
   npsn: "",
   contactName: "",
-  email: "",
   phone: "",
   address: "",
   password: "",
   confirmPassword: "",
 };
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validate(values: SchoolRegistrationFormValues): SchoolRegistrationErrors {
   const errors: SchoolRegistrationErrors = {};
@@ -57,10 +52,6 @@ function validate(values: SchoolRegistrationFormValues): SchoolRegistrationError
     errors.contactName = "Nama penanggung jawab wajib diisi.";
   }
 
-  if (!emailPattern.test(values.email.trim())) {
-    errors.email = "Masukkan format email yang valid.";
-  }
-
   if (!/^\+?[\d\s-]{10,15}$/.test(values.phone.trim())) {
     errors.phone = "Nomor telepon harus 10-15 karakter angka.";
   }
@@ -69,8 +60,8 @@ function validate(values: SchoolRegistrationFormValues): SchoolRegistrationError
     errors.address = "Alamat minimal 10 karakter.";
   }
 
-  if (!values.password || values.password.length < 6) {
-    errors.password = "Password minimal 6 karakter.";
+  if (!values.password || values.password.length < 8) {
+    errors.password = "Password minimal 8 karakter.";
   }
 
   if (values.confirmPassword !== values.password) {
@@ -91,7 +82,6 @@ export default function RegisterPage() {
     schoolName: false,
     npsn: false,
     contactName: false,
-    email: false,
     phone: false,
     address: false,
     password: false,
@@ -131,7 +121,6 @@ export default function RegisterPage() {
       schoolName: true,
       npsn: true,
       contactName: true,
-      email: true,
       phone: true,
       address: true,
       password: true,
@@ -152,7 +141,6 @@ export default function RegisterPage() {
         schoolName: values.schoolName.trim(),
         npsn: values.npsn.trim(),
         contactName: values.contactName.trim(),
-        email: values.email.trim(),
         phone: values.phone.trim(),
         address: values.address.trim(),
         password: values.password,
@@ -211,14 +199,14 @@ export default function RegisterPage() {
 
             <article className="rounded-[20px] border border-white/12 bg-white/8 px-[18px] py-5 backdrop-blur-[8px]">
               <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#f6f1e7a3]">
-                Kredensial
+                Login Sekolah
               </p>
               <strong className="mt-3 block font-[var(--font-fraunces)] text-[28px] font-medium leading-none tracking-[-0.03em] text-white">
                 Aktif
               </strong>
               <p className="mt-2.5 text-[14px] leading-7 text-[#f6f1e7c2]">
-                Gunakan email operasional yang benar-benar dipakai sekolah agar
-                notifikasi dan akses akun tetap jelas.
+                Sekolah masuk memakai NPSN dan password. Tidak perlu lagi
+                menyiapkan email untuk pendaftaran awal.
               </p>
             </article>
           </div>
@@ -228,8 +216,8 @@ export default function RegisterPage() {
               Catatan
             </p>
             <p className="mt-2.5 text-[14px] leading-7 text-[#f6f1e7c2]">
-              Setelah registrasi berhasil, masuk ke dashboard untuk mulai booking
-              pendampingan dan unggah dokumen pendukung sesuai kebutuhan sekolah.
+              Setelah registrasi berhasil, tunggu verifikasi operator lalu login
+              memakai NPSN sekolah untuk mulai booking dan unggah dokumen.
             </p>
           </div>
         </div>
@@ -244,7 +232,8 @@ export default function RegisterPage() {
             </h2>
             <p className="mt-3.5 max-w-[520px] text-[15px] leading-7 text-[#44536f]">
               Isi data sekolah dengan rapi. Form ini akan dipakai sebagai identitas
-              awal pada dashboard dan arsip layanan.
+              awal pada dashboard dan arsip layanan. Akses login sekolah memakai
+              NPSN dan password.
             </p>
           </div>
 
@@ -321,28 +310,6 @@ export default function RegisterPage() {
             <div className="grid gap-[18px] lg:grid-cols-2">
               <label className="grid gap-2.5">
                 <span className="m-0 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#213150]">
-                  Email
-                </span>
-                <input
-                  id="email"
-                  type="email"
-                  value={values.email}
-                  onChange={onFieldChange("email")}
-                  onBlur={onFieldBlur("email")}
-                  placeholder="admin@sekolah.sch.id"
-                  aria-invalid={Boolean(touched.email && errors.email)}
-                  aria-describedby={errors.email ? "email-error" : undefined}
-                  className={`${fieldInputClassName} ${touched.email && errors.email ? "border-[#bb5555]" : ""}`}
-                />
-                {touched.email && errors.email ? (
-                  <small id="email-error" className="text-[12px] font-bold leading-[1.5] text-[#9c3535]">
-                    {errors.email}
-                  </small>
-                ) : null}
-              </label>
-
-              <label className="grid gap-2.5">
-                <span className="m-0 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#213150]">
                   No. Telepon
                 </span>
                 <input
@@ -398,7 +365,7 @@ export default function RegisterPage() {
                   onChange={onFieldChange("password")}
                   onBlur={onFieldBlur("password")}
                   autoComplete="new-password"
-                  placeholder="Minimal 6 karakter"
+                  placeholder="Minimal 8 karakter"
                   aria-invalid={Boolean(touched.password && errors.password)}
                   aria-describedby={errors.password ? "password-error" : undefined}
                   className={`${fieldInputClassName} ${touched.password && errors.password ? "border-[#bb5555]" : ""}`}
@@ -466,7 +433,7 @@ export default function RegisterPage() {
                 <Link href="/login" className="font-bold underline underline-offset-[0.18em]">
                   login
                 </Link>{" "}
-                untuk masuk ke dashboard.
+                memakai NPSN sekolah untuk masuk ke dashboard.
               </p>
             </div>
           ) : null}
@@ -476,8 +443,8 @@ export default function RegisterPage() {
               Sebelum kirim
             </p>
             <p className="mt-2.5 text-[13px] leading-7 text-[#4f5a70]">
-              Pastikan email dan nomor telepon sekolah aktif. Data ini akan dipakai
-              untuk identitas akun dan komunikasi selama proses pendampingan.
+              Pastikan NPSN, nomor telepon, dan alamat sekolah benar. Setelah akun
+              disetujui operator, sekolah masuk memakai NPSN dan password.
             </p>
           </div>
 

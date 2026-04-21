@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use, useState } from "react";
 import { useDashboard } from "@/lib/DashboardContext";
 import { Modal } from "@/components/ui/Modal";
+import { openBookingPrintReport } from "@/lib/bookingPrint";
 import { formatLongDateID } from "@/lib/userDashboardData";
 
 function getStatusClasses(status: string) {
@@ -20,7 +21,7 @@ function getStatusClasses(status: string) {
 
 export default function AdminBookingDetailPage({ params }: { params: Promise<{ bookingId: string }> }) {
   const { bookingId } = use(params);
-  const { bookings, documents, approveBooking, rejectBooking, startSession, confirmBookingDone, addSupervisorNotes, dashboardLoading } = useDashboard();
+  const { bookings, documents, histories, approveBooking, rejectBooking, startSession, confirmBookingDone, addSupervisorNotes, addToast, dashboardLoading } = useDashboard();
 
   const booking = bookings.find((b) => b.id === bookingId);
   const relatedDocs = documents.filter((d) => d.bookingId === bookingId);
@@ -132,6 +133,23 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ b
           {(booking.status === "Dalam Proses" || booking.status === "Selesai") && (
             <button type="button" onClick={() => { setSupervisorNotes(booking.supervisorNotes ?? ""); setNotesModal(true); }} className="rounded-xl border border-[#d8deeb] bg-white px-4 py-2.5 text-[12px] font-bold text-[#4f5b77] hover:bg-[#f5f3f7]">Catatan Pengawas</button>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              const opened = openBookingPrintReport({
+                booking,
+                documents: relatedDocs,
+                history: histories.find((item) => item.bookingId === booking.id) ?? null,
+              });
+
+              if (!opened) {
+                addToast("Popup cetak diblokir browser. Izinkan popup lalu coba lagi.", "error");
+              }
+            }}
+            className="rounded-xl border border-[#ffb660] bg-[#fff3e2] px-4 py-2.5 text-[12px] font-bold text-[#d96f05] transition-colors hover:bg-[#ffe7c9]"
+          >
+            Cetak Laporan
+          </button>
         </div>
       </div>
 

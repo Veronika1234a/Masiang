@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { isEmailIdentity, isNpsnIdentity } from "@/lib/authIdentity";
 import { useAuth } from "@/lib/AuthContext";
 import { resolvePostLoginRedirect } from "@/lib/userFlow";
 
@@ -17,8 +18,6 @@ export interface LoginFormValues {
 type LoginFormErrors = Partial<Record<LoginField, string>>;
 type SubmitStatus = "idle" | "error" | "success" | "auth_error";
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 const initialValues: LoginFormValues = {
   identity: "",
   password: "",
@@ -27,8 +26,9 @@ const initialValues: LoginFormValues = {
 function validate(values: LoginFormValues): LoginFormErrors {
   const errors: LoginFormErrors = {};
 
-  if (!emailPattern.test(values.identity.trim())) {
-    errors.identity = "Masukkan email yang valid.";
+  const normalizedIdentity = values.identity.trim();
+  if (!isEmailIdentity(normalizedIdentity) && !isNpsnIdentity(normalizedIdentity)) {
+    errors.identity = "Masukkan NPSN sekolah 8 digit atau email admin yang valid.";
   }
 
   if (!values.password) {
@@ -169,8 +169,8 @@ function LoginPageContent() {
               Untuk sekolah dan admin
             </p>
             <p className="mt-2.5 text-[14px] leading-7 text-[#f6f1e7c2]">
-              Gunakan email yang sudah terdaftar. Jika akun belum dibuat, daftar
-              sekolah terlebih dahulu lalu masuk ke dashboard sesuai peran.
+              Sekolah masuk memakai NPSN dan password. Admin dan akun lama tetap
+              bisa memakai email yang sudah terdaftar.
             </p>
           </div>
         </div>
@@ -184,7 +184,8 @@ function LoginPageContent() {
               Akses dashboard
             </h2>
             <p className="mt-3.5 text-[15px] leading-7 text-[#44536f]">
-              Masukkan kredensial akun untuk melanjutkan ke area kerja Anda.
+              Masukkan NPSN sekolah atau email admin beserta kata sandi untuk
+              melanjutkan ke area kerja Anda.
             </p>
           </div>
 
@@ -198,16 +199,16 @@ function LoginPageContent() {
           <form className="mt-6 grid gap-[18px]" onSubmit={onSubmit} noValidate>
             <label className="grid gap-2.5">
               <span className="m-0 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#213150]">
-                Email
+                NPSN / Email
               </span>
               <input
                 id="identity"
-                type="email"
+                type="text"
                 value={values.identity}
                 onChange={onChange("identity")}
                 onBlur={onBlur("identity")}
                 autoComplete="username"
-                placeholder="contoh: sdn1mappak@gmail.com"
+                placeholder="Contoh: 10265538 atau admin@masiang.id"
                 aria-invalid={Boolean(touched.identity && errors.identity)}
                 aria-describedby={errors.identity ? "identity-error" : undefined}
                 className={`${fieldInputClassName} ${touched.identity && errors.identity ? "border-[#bb5555]" : ""}`}
@@ -287,8 +288,8 @@ function LoginPageContent() {
               Informasi login
             </p>
             <p className="mt-2.5 text-[13px] leading-7 text-[#4f5a70]">
-              Akses menggunakan email dan password yang sudah terdaftar pada
-              sistem. Belum punya akun sekolah? Gunakan halaman pendaftaran.
+              Sekolah masuk dengan NPSN dan password. Admin tetap memakai email
+              dan password yang sudah terdaftar. Belum punya akun sekolah? Gunakan halaman pendaftaran.
             </p>
           </div>
 

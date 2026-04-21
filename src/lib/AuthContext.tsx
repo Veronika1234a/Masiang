@@ -45,7 +45,6 @@ export interface RegisterInput {
   schoolName: string;
   npsn: string;
   contactName: string;
-  email: string;
   phone: string;
   address: string;
   password: string;
@@ -53,6 +52,7 @@ export interface RegisterInput {
 
 export interface RegisteredSchool extends RegisterInput {
   id: string;
+  email: string;
   approvalStatus: SchoolApprovalStatus;
   approvalReviewedAt?: string;
   approvalReviewedBy?: string;
@@ -398,7 +398,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (data: RegisterInput): Promise<{ success: boolean; error?: string }> => {
       const payload: SignUpPayload = {
-        email: data.email,
         password: data.password,
         schoolName: data.schoolName,
         npsn: data.npsn,

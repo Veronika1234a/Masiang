@@ -12,13 +12,14 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
-    actionTimeout: 15000,
-    navigationTimeout: 20000,
+    actionTimeout: 20000,
+    navigationTimeout: 45000,
   },
   webServer: {
-    command: "npm run dev",
+    command: "npm run build && npm run start",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
+    timeout: 240000,
     env: {
       E2E_TEST_MODE: "1",
       NEXT_PUBLIC_E2E_TEST_MODE: "1",

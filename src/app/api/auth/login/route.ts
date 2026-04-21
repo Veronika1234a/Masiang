@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
+import { buildSchoolInternalEmail, isEmailIdentity, isNpsnIdentity, normalizeLoginIdentity } from "@/lib/authIdentity";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
 interface LoginRequest {
+  identity?: string;
   email?: string;
   password?: string;
 }
@@ -68,11 +71,38 @@ export async function POST(request: Request) {
     return jsonError("Payload login tidak valid.");
   }
 
-  const email = body.email?.trim().toLowerCase();
+  const identity = normalizeLoginIdentity(body.identity ?? body.email ?? "");
   const password = body.password ?? "";
 
-  if (!email || !password) {
-    return jsonError("Email dan kata sandi wajib diisi.");
+  if (!identity || !password) {
+    return jsonError("NPSN/email dan kata sandi wajib diisi.");
+  }
+
+  let email = identity;
+  if (!isEmailIdentity(identity)) {
+    if (!isNpsnIdentity(identity)) {
+      return jsonError("Masukkan NPSN sekolah 8 digit atau email admin yang valid.");
+    }
+
+    let adminClient;
+    try {
+      adminClient = createAdminClient();
+    } catch {
+      return jsonError("Server login belum siap untuk memvalidasi NPSN sekolah.", 500);
+    }
+
+    const { data: profile, error: profileError } = await adminClient
+      .from("profiles")
+      .select("email")
+      .eq("npsn", identity)
+      .eq("role", "school")
+      .maybeSingle();
+
+    if (profileError) {
+      return jsonError("Gagal memvalidasi identitas sekolah.", 500);
+    }
+
+    email = profile?.email ?? buildSchoolInternalEmail(identity);
   }
 
   const supabase = await createServerSupabaseClient();

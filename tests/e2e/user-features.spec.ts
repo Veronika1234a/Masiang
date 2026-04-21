@@ -1,17 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "./support/fixtures";
-
-async function login(page: Parameters<typeof test>[0]["page"], email: string) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Kata Sandi").fill("password123");
-  await page.getByRole("button", { name: "Masuk" }).click();
-  await expect(page).toHaveURL(
-    email === "admin@example.com"
-      ? /\/dashboard-admin(?:\?.*)?$/
-      : /\/dashboard\/ringkasan(?:\?.*)?$/,
-  );
-}
+import { gotoPath, loginSchool, openSchoolBookingPage } from "./support/app";
 
 test("school booking page supports search, status/date filter, sort, pagination, and reset", async ({
   page,
@@ -132,8 +121,8 @@ test("school booking page supports search, status/date filter, sort, pagination,
 
   backend.state.bookings.unshift(...bookingRows);
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/booking");
+  await loginSchool(page);
+  await openSchoolBookingPage(page);
 
   await expect(page.getByText("Halaman 1 dari 2")).toBeVisible();
   await page.getByRole("button", { name: "Berikutnya" }).click();
@@ -186,8 +175,8 @@ test("school can cancel booking from booking detail page", async ({ page, backen
     created_at: "2026-03-19T08:00:00.000Z",
   });
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/booking/BK-U701");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/booking/BK-U701");
 
   await expect(page.getByRole("button", { name: "Batalkan Booking" })).toBeVisible();
   await page.getByRole("button", { name: "Batalkan Booking" }).click();
@@ -250,8 +239,8 @@ test("school can use booking calendar status filter and open detail from event p
     },
   );
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/booking-jadwal");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/booking-jadwal");
 
   await page.getByRole("button", { name: "Disetujui" }).click();
   await expect(page.getByRole("button", { name: /08\.00 - 10\.00 WITA/ })).toBeVisible();

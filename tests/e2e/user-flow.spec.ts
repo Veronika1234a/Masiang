@@ -1,5 +1,14 @@
 import { expect } from "@playwright/test";
 import { test } from "./support/fixtures";
+import {
+  gotoPath,
+  loginAdmin,
+  loginSchool,
+  logout,
+  openSchoolBookingPage,
+  registerSchool,
+  submitLoginForm,
+} from "./support/app";
 
 function futureDate(daysAhead: number) {
   const date = new Date();
@@ -7,36 +16,14 @@ function futureDate(daysAhead: number) {
   return date.toISOString().slice(0, 10);
 }
 
-async function login(
-  page: Parameters<typeof test>[0]["page"],
-  email: string,
-  password = "password123",
-) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Kata Sandi").fill(password);
-  await page.getByRole("button", { name: "Masuk" }).click();
-  await expect(page).toHaveURL(
-    email === "admin@example.com"
-      ? /\/dashboard-admin(?:\?.*)?$/
-      : /\/dashboard\/ringkasan(?:\?.*)?$/,
-  );
-}
-
-async function logout(page: Parameters<typeof test>[0]["page"]) {
-  await page.getByRole("button", { name: "Logout" }).click();
-  await expect(page).toHaveURL(/\/login(?:\?.*)?$/);
-  await expect(page.getByLabel("Email")).toBeVisible();
-}
-
 test("school and admin can complete the main lifecycle end-to-end", async ({ page, backend }) => {
   backend.reset();
   const bookingDate = futureDate(2);
 
-  await login(page, "school@example.com");
+  await loginSchool(page);
   await expect(page.getByText("Halo, SDN 1 Makale.")).toBeVisible();
 
-  await page.goto("/dashboard/booking-baru");
+  await gotoPath(page, "/dashboard/booking-baru");
   await page.getByLabel("Topik Pendampingan").fill("Supervisi Akademik Semester Genap");
   await page.getByLabel("Kategori Layanan").selectOption("Supervisi");
   await page.getByLabel("Tanggal").fill(bookingDate);
@@ -51,17 +38,16 @@ test("school and admin can complete the main lifecycle end-to-end", async ({ pag
   const bookingId = successText?.match(/Booking\s+(BK-[A-Z0-9]+)/)?.[1];
   expect(bookingId).toBeTruthy();
 
-  await page.getByRole("link", { name: "Lihat Daftar Booking" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/booking$/);
+  await openSchoolBookingPage(page);
   await expect(page.getByText(bookingId!, { exact: true })).toBeVisible();
 
   await logout(page);
 
-  await login(page, "admin@example.com");
+  await loginAdmin(page);
   await expect(page).toHaveURL(/\/dashboard-admin$/);
   await expect(page.getByText("Dashboard admin,")).toBeVisible();
 
-  await page.goto("/dashboard-admin/booking");
+  await gotoPath(page, "/dashboard-admin/booking");
   const bookingRow = page.locator("tr", { hasText: bookingId! });
   await expect(bookingRow).toContainText("Supervisi Akademik Semester Genap");
   await bookingRow.getByRole("button", { name: "Setujui" }).click();
@@ -75,8 +61,8 @@ test("school and admin can complete the main lifecycle end-to-end", async ({ pag
 
   await logout(page);
 
-  await login(page, "school@example.com");
-  await page.goto(`/dashboard/booking/${bookingId}`);
+  await loginSchool(page);
+  await gotoPath(page, `/dashboard/booking/${bookingId}`);
   await expect(page.getByText("Catatan Pengawas")).toBeVisible();
   await expect(page.getByText("Lanjutkan penguatan refleksi guru")).toBeVisible();
 
@@ -90,8 +76,8 @@ test("school and admin can complete the main lifecycle end-to-end", async ({ pag
 
   await logout(page);
 
-  await login(page, "admin@example.com");
-  await page.goto("/dashboard-admin/dokumen");
+  await loginAdmin(page);
+  await gotoPath(page, "/dashboard-admin/dokumen");
   const firstDocRow = page.locator("tr", { hasText: "Laporan Observasi.pdf" });
   await firstDocRow.getByRole("button", { name: "Minta Revisi" }).click();
   await page.getByPlaceholder("Jelaskan bagian yang perlu direvisi...").fill("Tambahkan ringkasan hasil refleksi guru.");
@@ -100,8 +86,8 @@ test("school and admin can complete the main lifecycle end-to-end", async ({ pag
 
   await logout(page);
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/dokumen");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/dokumen");
   const revisedArticle = page.locator("article", { hasText: "Laporan Observasi.pdf" });
   await expect(revisedArticle).toContainText("Perlu Revisi");
   await revisedArticle.getByRole("button", { name: "Upload Revisi" }).click();
@@ -114,22 +100,22 @@ test("school and admin can complete the main lifecycle end-to-end", async ({ pag
 
   await logout(page);
 
-  await login(page, "admin@example.com");
-  await page.goto("/dashboard-admin/dokumen");
+  await loginAdmin(page);
+  await gotoPath(page, "/dashboard-admin/dokumen");
   const revisedDocRow = page.locator("tr", { hasText: "Laporan Observasi Revisi.pdf" });
   await revisedDocRow.getByRole("button", { name: "Setujui" }).click();
   await page.getByRole("button", { name: "Konfirmasi Setujui" }).click();
   await expect(page.getByText(/ditandai disetujui\./)).toBeVisible();
 
-  await page.goto("/dashboard-admin/booking");
+  await gotoPath(page, "/dashboard-admin/booking");
   const inProgressRow = page.locator("tr", { hasText: bookingId! });
   await inProgressRow.getByRole("button", { name: "Selesai" }).click();
   await expect(page.getByText(`Sesi ${bookingId} ditandai selesai.`)).toBeVisible();
 
   await logout(page);
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/riwayat");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/riwayat");
   await expect(page.getByRole("heading", { name: "Supervisi Akademik Semester Genap" })).toBeVisible();
   const historyLink = page.getByRole("link", { name: "Lihat Detail" }).first();
   await historyLink.click();
@@ -137,7 +123,7 @@ test("school and admin can complete the main lifecycle end-to-end", async ({ pag
   await page.getByRole("button", { name: "Tandai Semua Selesai" }).click();
   await expect(page.getByText("Semua tindak lanjut ditandai selesai.")).toBeVisible();
 
-  await page.goto(`/dashboard/booking/${bookingId}`);
+  await gotoPath(page, `/dashboard/booking/${bookingId}`);
   const ratingSection = page.locator("section").filter({ hasText: "Berikan Rating & Feedback" });
   await ratingSection.getByRole("button").nth(3).click();
   await ratingSection.getByPlaceholder("Bagikan pengalaman Anda selama sesi...").fill("Pendampingan sangat membantu untuk refleksi guru.");
@@ -225,8 +211,8 @@ test("school can update profile and admin can inspect schools and documents", as
     created_at: "2026-03-18T12:31:00.000Z",
   });
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/profil");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/profil");
   await page.getByRole("button", { name: "Edit Profil" }).click();
   await page.locator('input[value="Makale"]').fill("Makale Utara");
   await page.locator('input[value="081234567890"]').fill("081299988877");
@@ -234,14 +220,14 @@ test("school can update profile and admin can inspect schools and documents", as
   await expect(page.getByText("Profil berhasil disimpan.")).toBeVisible();
   await expect(page.locator("div").filter({ hasText: /^Makale Utara$/ }).first()).toBeVisible();
 
-  await page.goto("/dashboard/ringkasan");
+  await gotoPath(page, "/dashboard/ringkasan");
   await page.locator("header").getByRole("button").first().click();
   await page.getByRole("button", { name: "Riwayat Tersedia" }).click();
   await expect(page).toHaveURL(/\/dashboard\/riwayat\/RH-201$/);
 
   await logout(page);
 
-  await login(page, "admin@example.com");
+  await loginAdmin(page);
   await page.getByRole("link", { name: "Daftar Sekolah" }).click();
   await page.getByRole("button", { name: "Lihat Detail" }).first().click();
   await expect(page.getByText("Dokumen Sekolah")).toBeVisible();
@@ -337,8 +323,8 @@ test("school can change password, upload avatar, print reports, and download doc
   });
   backend.state.storagePaths.push("school-1/laporan-literasi.pdf");
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/profil");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/profil");
   await page.getByRole("button", { name: "Ganti Password" }).click();
   await page.getByLabel("Password Saat Ini").fill("password123");
   await page.getByLabel("Password Baru", { exact: true }).fill("password456");
@@ -356,17 +342,17 @@ test("school can change password, upload avatar, print reports, and download doc
   await expect(page.getByAltText("Foto profil SDN 1 Makale")).toBeVisible();
 
   await logout(page);
-  await login(page, "school@example.com", "password456");
+  await loginSchool(page, "12345678", "password456");
   await expect(page).toHaveURL(/\/dashboard\/ringkasan$/);
 
-  await page.goto("/dashboard/riwayat/RH-301");
+  await gotoPath(page, "/dashboard/riwayat/RH-301");
   const schoolDownloadPopupPromise = page.waitForEvent("popup");
   await page.locator("article", { hasText: "Laporan Literasi.pdf" }).getByRole("button", { name: "Unduh" }).click();
   const schoolDownloadPopup = await schoolDownloadPopupPromise;
   await schoolDownloadPopup.waitForLoadState("domcontentloaded");
   await expect(schoolDownloadPopup).toHaveURL(/\/storage\/v1\/object\/sign\/school-documents\/school-1\/laporan-literasi\.pdf/);
 
-  await page.goto("/dashboard/booking/BK-301");
+  await gotoPath(page, "/dashboard/booking/BK-301");
   const printPopupPromise = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Cetak" }).click();
   const printPopup = await printPopupPromise;
@@ -374,8 +360,8 @@ test("school can change password, upload avatar, print reports, and download doc
   await expect(page.getByText("Popup cetak diblokir browser. Izinkan popup lalu coba lagi.")).toHaveCount(0);
 
   await logout(page);
-  await login(page, "admin@example.com");
-  await page.goto("/dashboard-admin/detail-dokumen?documentId=DOC-301");
+  await loginAdmin(page);
+  await gotoPath(page, "/dashboard-admin/detail-dokumen?documentId=DOC-301");
   const adminDownloadPopupPromise = page.waitForEvent("popup");
   await page.locator("article", { hasText: "Berita Acara Pendampingan.pdf" }).getByRole("button", { name: "Unduh" }).click();
   const adminDownloadPopup = await adminDownloadPopupPromise;
@@ -386,32 +372,28 @@ test("school can change password, upload avatar, print reports, and download doc
 test("school registration waits for admin approval before login succeeds", async ({ page, backend }) => {
   backend.reset();
 
-  const schoolEmail = "newschool@example.com";
   const schoolPassword = "password123";
   const schoolName = "SMP Negeri Test";
+  const schoolNpsn = "87654321";
 
-  await page.goto("/daftar-sekolah");
-  await page.getByLabel("Nama Sekolah").fill(schoolName);
-  await page.getByLabel("NPSN").fill("87654321");
-  await page.getByLabel("Nama Penanggung Jawab").fill("Budi");
-  await page.getByLabel("Email").fill(schoolEmail);
-  await page.getByLabel("No. Telepon").fill("081212121212");
-  await page.getByLabel("Alamat Sekolah").fill("Jl. Test No. 2");
-  await page.getByLabel("Password", { exact: true }).fill(schoolPassword);
-  await page.getByLabel("Konfirmasi Password", { exact: true }).fill(schoolPassword);
-  await page.getByRole("button", { name: "Daftar Sekolah" }).click();
+  await registerSchool(page, {
+    schoolName,
+    npsn: schoolNpsn,
+    contactName: "Budi",
+    phone: "081212121212",
+    address: "Jl. Test No. 2",
+    password: schoolPassword,
+  });
   await expect(page.getByText("Registrasi berhasil!")).toBeVisible();
-  expect(backend.state.accounts.find((account) => account.email === schoolEmail)?.approval_status).toBe("pending");
+  expect(backend.state.accounts.find((account) => account.npsn === schoolNpsn)?.approval_status).toBe("pending");
 
-  await page.goto("/login?redirectTo=%2Fdashboard%2Fbooking-baru%3Fdate%3D2026-03-24");
-  await page.getByLabel("Email").fill(schoolEmail);
-  await page.getByLabel("Kata Sandi").fill(schoolPassword);
-  await page.getByRole("button", { name: "Masuk" }).click();
+  await gotoPath(page, "/login?redirectTo=%2Fdashboard%2Fbooking-baru%3Fdate%3D2026-03-24");
+  await submitLoginForm(page, schoolNpsn, schoolPassword);
   await expect(page.getByText("Akun menunggu verifikasi operator sekolah.")).toBeVisible();
 
-  await login(page, "admin@example.com");
+  await loginAdmin(page);
   await expect(page).toHaveURL(/\/dashboard-admin$/);
-  await page.goto("/dashboard-admin/sekolah");
+  await gotoPath(page, "/dashboard-admin/sekolah");
   const schoolCard = page.locator("article", { hasText: schoolName });
   await expect(schoolCard).toContainText("Pending");
   await schoolCard.getByRole("button", { name: "Setujui Akun" }).click();
@@ -420,10 +402,9 @@ test("school registration waits for admin approval before login succeeds", async
 
   await logout(page);
 
-  await page.goto("/login?redirectTo=%2Fdashboard%2Fbooking-baru%3Fdate%3D2026-03-24");
-  await page.getByLabel("Email").fill(schoolEmail);
-  await page.getByLabel("Kata Sandi").fill(schoolPassword);
-  await page.getByRole("button", { name: "Masuk" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/booking-baru\?date=2026-03-24$/);
+  await gotoPath(page, "/login?redirectTo=%2Fdashboard%2Fbooking-baru%3Fdate%3D2026-03-24");
+  await submitLoginForm(page, schoolNpsn, schoolPassword);
+  await expect(page).toHaveURL(/\/dashboard\/ringkasan$/);
+  await gotoPath(page, "/dashboard/booking-baru?date=2026-03-24");
   await expect(page.getByLabel("Tanggal")).toHaveValue("2026-03-24");
 });

@@ -1,17 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "./support/fixtures";
-
-async function login(page: Parameters<typeof test>[0]["page"], email: string) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Kata Sandi").fill("password123");
-  await page.getByRole("button", { name: "Masuk" }).click();
-  await expect(page).toHaveURL(
-    email === "admin@example.com"
-      ? /\/dashboard-admin(?:\?.*)?$/
-      : /\/dashboard\/ringkasan(?:\?.*)?$/,
-  );
-}
+import { loginSchool } from "./support/app";
 
 test("notification quality: no duplicate cards, sorted by time, unread badge updates, and deep-link works", async ({
   page,
@@ -215,7 +204,7 @@ test("notification quality: no duplicate cards, sorted by time, unread badge upd
     },
   );
 
-  await login(page, "school@example.com");
+  await loginSchool(page);
   await page.goto("/dashboard/ringkasan");
 
   const notifBell = page.getByRole("button", { name: "Notifikasi" });
@@ -325,7 +314,7 @@ test("document revision chain keeps parent/version/history/booking relation cons
   });
   backend.state.storagePaths.push("school-1/laporan-awal.pdf");
 
-  await login(page, "school@example.com");
+  await loginSchool(page);
   await page.goto("/dashboard/dokumen");
 
   const initialCard = page.locator("article", { hasText: "Laporan Awal.pdf" });

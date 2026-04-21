@@ -1,22 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "./support/fixtures";
-
-async function login(page: Parameters<typeof test>[0]["page"], email: string) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Kata Sandi").fill("password123");
-  await page.getByRole("button", { name: "Masuk" }).click();
-  await expect(page).toHaveURL(
-    email === "admin@example.com"
-      ? /\/dashboard-admin(?:\?.*)?$/
-      : /\/dashboard\/ringkasan(?:\?.*)?$/,
-  );
-}
-
-async function logout(page: Parameters<typeof test>[0]["page"]) {
-  await page.getByRole("button", { name: "Logout" }).click();
-  await expect(page).toHaveURL(/\/login(?:\?.*)?$/);
-}
+import { gotoPath, loginAdmin, loginSchool, logout, openSchoolBookingPage } from "./support/app";
 
 test("school can cancel a booking and admin can clear the resulting notification", async ({ page, backend }) => {
   backend.reset();
@@ -40,8 +24,8 @@ test("school can cancel a booking and admin can clear the resulting notification
     created_at: "2026-03-13T08:00:00.000Z",
   });
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/booking");
+  await loginSchool(page);
+  await openSchoolBookingPage(page);
 
   const bookingArticle = page.locator("article", { hasText: "Pendampingan Kurikulum" });
   await expect(bookingArticle).toContainText("Menunggu");
@@ -53,7 +37,7 @@ test("school can cancel a booking and admin can clear the resulting notification
 
   await logout(page);
 
-  await login(page, "admin@example.com");
+  await loginAdmin(page);
   await page.getByRole("button", { name: "Notifikasi" }).click();
   await expect(page.getByRole("button", { name: "Booking Dibatalkan" })).toBeVisible();
   await page.getByRole("button", { name: "Tandai semua dibaca" }).click();
@@ -63,8 +47,8 @@ test("school can cancel a booking and admin can clear the resulting notification
 test("school can upload and delete a document from the document workspace", async ({ page, backend }) => {
   backend.reset();
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/dokumen");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/dokumen");
   await page.getByRole("button", { name: "Melayani" }).click();
   await page.locator('input[type="file"]').first().setInputFiles({
     name: "Dokumen Observasi.pdf",
@@ -84,19 +68,80 @@ test("school can upload and delete a document from the document workspace", asyn
   await expect(documentHeading).toHaveCount(0);
 });
 
+test("school can add a link document and admin can open it from review", async ({ page, backend }) => {
+  backend.reset();
+
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/dokumen");
+  await page.getByRole("button", { name: "Laporan" }).click();
+  await page.getByLabel("Judul Link").fill("Rekap Program Kerja");
+  await page.getByLabel("Tautan").fill("https://example.com/rekap-program-kerja");
+  await page.getByRole("button", { name: "Tambah Link" }).click();
+
+  const linkArticle = page.locator("article", { hasText: "Rekap Program Kerja" });
+  await expect(page.getByText('Dokumen "Rekap Program Kerja" berhasil diunggah.')).toBeVisible();
+  await expect(linkArticle).toContainText("Link");
+  await expect(linkArticle).toContainText("Laporan");
+
+  await logout(page);
+
+  await loginAdmin(page);
+  await gotoPath(page, "/dashboard-admin/dokumen");
+  const linkRow = page.locator("tr", { hasText: "Rekap Program Kerja" });
+  await expect(linkRow).toContainText("Buka Link");
+
+  const linkPopupPromise = page.waitForEvent("popup");
+  await linkRow.getByRole("button", { name: "Buka Link" }).click();
+  const linkPopup = await linkPopupPromise;
+  await linkPopup.waitForLoadState("domcontentloaded");
+  await expect(linkPopup).toHaveURL(/example\.com\/rekap-program-kerja/);
+});
+
+test("school can upload image and video documents with the correct labels", async ({ page, backend }) => {
+  backend.reset();
+
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/dokumen");
+  await page.getByRole("button", { name: "Pelaksanaan" }).click();
+  const fileInput = page.locator('input[type="file"]').first();
+
+  await fileInput.setInputFiles([
+    {
+      name: "Foto Kegiatan.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("mock image"),
+    },
+    {
+      name: "Video Kegiatan.mp4",
+      mimeType: "video/mp4",
+      buffer: Buffer.from("mock video"),
+    },
+  ]);
+
+  await expect(page.getByText('Dokumen "Foto Kegiatan.jpg" berhasil diunggah.')).toBeVisible();
+  await expect(page.getByText('Dokumen "Video Kegiatan.mp4" berhasil diunggah.')).toBeVisible();
+
+  const imageArticle = page.locator("article", { hasText: "Foto Kegiatan.jpg" });
+  const videoArticle = page.locator("article", { hasText: "Video Kegiatan.mp4" });
+  await expect(imageArticle).toContainText("Foto");
+  await expect(imageArticle).toContainText("Pelaksanaan");
+  await expect(videoArticle).toContainText("Video");
+  await expect(videoArticle).toContainText("Pelaksanaan");
+});
+
 test("route guards redirect unauthenticated and wrong-role users to the correct area", async ({ page, backend }) => {
   backend.reset();
 
-  await page.goto("/dashboard/booking");
+  await gotoPath(page, "/dashboard/ringkasan");
   await expect(page).toHaveURL(/\/login$/);
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard-admin");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard-admin");
   await expect(page).toHaveURL(/\/dashboard\/ringkasan$/);
 
   await logout(page);
 
-  await login(page, "admin@example.com");
-  await page.goto("/dashboard/booking");
+  await loginAdmin(page);
+  await gotoPath(page, "/dashboard/ringkasan");
   await expect(page).toHaveURL(/\/dashboard-admin$/);
 });

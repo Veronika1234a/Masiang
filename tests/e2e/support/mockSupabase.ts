@@ -238,6 +238,14 @@ function normalizeBookingSession(value: string): string {
   return `${digits.slice(0, 2)}.${digits.slice(2, 4)} - ${digits.slice(4, 6)}.${digits.slice(6, 8)} WITA`;
 }
 
+function buildManagedSchoolEmail(npsn: string | null): string | null {
+  if (!npsn) {
+    return null;
+  }
+
+  return `npsn-${npsn}@school.masiang.local`;
+}
+
 function toAuthUser(account: MockAccount) {
   return {
     id: account.id,
@@ -476,7 +484,8 @@ export class MockSupabaseBackend {
       const body = parseBody(route.request().postData() ?? null) as { email?: string; password?: string } | null;
       const account = this.state.accounts.find(
         (candidate) =>
-          candidate.email === body?.email &&
+          (candidate.email === body?.email ||
+            buildManagedSchoolEmail(candidate.npsn) === body?.email) &&
           candidate.password === body?.password,
       );
 

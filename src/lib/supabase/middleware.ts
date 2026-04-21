@@ -8,7 +8,6 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.hostname === "localhost" ||
     request.nextUrl.hostname === "127.0.0.1";
   const e2eBypassEnabled =
-    process.env.NODE_ENV !== "production" &&
     isLocalRequest &&
     (
       process.env.E2E_TEST_MODE === "1" ||

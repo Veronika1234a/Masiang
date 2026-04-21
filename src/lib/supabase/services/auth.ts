@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { buildSchoolInternalEmail, isNpsnIdentity } from "@/lib/authIdentity";
 import { createClient } from "../client";
 import type { Database } from "../types";
 import type { SchoolApprovalStatus } from "./profiles";
@@ -10,7 +11,6 @@ type AuthProfileSnapshot = Pick<
 >;
 
 export interface SignUpPayload {
-  email: string;
   password: string;
   schoolName: string;
   npsn: string;
@@ -35,11 +35,11 @@ function mapAuthErrorMessage(message?: string | null) {
   }
 
   if (normalized.includes("invalid login credentials")) {
-    return "Email atau kata sandi tidak cocok.";
+    return "NPSN/email atau kata sandi tidak cocok.";
   }
 
   if (normalized.includes("user already registered")) {
-    return "Email ini sudah terdaftar. Silakan login atau hubungi operator sekolah.";
+    return "NPSN ini sudah terdaftar. Silakan login atau hubungi operator sekolah.";
   }
 
   if (normalized.includes("signup is disabled")) {
@@ -131,14 +131,14 @@ async function blockSchoolSession(
   return { user: null, profile: null, error: message };
 }
 
-export async function signIn(email: string, password: string) {
+export async function signIn(identity: string, password: string) {
   if (!isLocalE2EMode()) {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identity, password }),
     });
     const body = (await response.json().catch(() => null)) as
       | { user?: User; profile?: AuthProfileSnapshot; error?: string }
@@ -156,8 +156,11 @@ export async function signIn(email: string, password: string) {
   }
 
   const supabase = createClient();
+  const resolvedIdentity = isNpsnIdentity(identity)
+    ? buildSchoolInternalEmail(identity)
+    : identity;
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
+    email: resolvedIdentity,
     password,
   });
   if (error) return { user: null, profile: null, error: mapAuthErrorMessage(error.message) };
@@ -212,8 +215,9 @@ export async function signUp(payload: SignUpPayload) {
   }
 
   const supabase = createClient();
+  const signupEmail = buildSchoolInternalEmail(payload.npsn);
   const { data, error } = await supabase.auth.signUp({
-    email: payload.email,
+    email: signupEmail,
     password: payload.password,
     options: {
       data: {

@@ -1,17 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "./support/fixtures";
-
-async function login(page: Parameters<typeof test>[0]["page"], email: string) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Kata Sandi").fill("password123");
-  await page.getByRole("button", { name: "Masuk" }).click();
-  await expect(page).toHaveURL(
-    email === "admin@example.com"
-      ? /\/dashboard-admin(?:\?.*)?$/
-      : /\/dashboard\/ringkasan(?:\?.*)?$/,
-  );
-}
+import { gotoPath, loginSchool, openSchoolBookingPage } from "./support/app";
 
 test("failure path: cancel booking rolls back when booking update API fails", async ({
   page,
@@ -37,8 +26,8 @@ test("failure path: cancel booking rolls back when booking update API fails", as
     created_at: "2026-03-23T08:00:00.000Z",
   });
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/booking");
+  await loginSchool(page);
+  await openSchoolBookingPage(page);
 
   const bookingCard = page.locator("article", { hasText: "BK-F501" });
   await expect(bookingCard).toContainText("Menunggu");
@@ -63,8 +52,8 @@ test("failure path: upload document shows error and does not add document when s
   backend,
 }) => {
   backend.reset();
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/dokumen");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/dokumen");
 
   backend.failNextRequest({
     method: "POST",
@@ -89,8 +78,8 @@ test("failure path: session-expired style error on profile save keeps edit mode 
   backend,
 }) => {
   backend.reset();
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/profil");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/profil");
 
   await page.getByRole("button", { name: "Edit Profil" }).click();
   await page.locator('input[value="Makale"]').fill("Makale Timur");
@@ -114,7 +103,7 @@ test("session longevity: school remains authenticated after idle period and refr
   backend,
 }) => {
   backend.reset();
-  await login(page, "school@example.com");
+  await loginSchool(page);
   await expect(page).toHaveURL(/\/dashboard\/ringkasan$/);
   await expect(page.getByText("Halo, SDN 1 Makale.")).toBeVisible();
 
@@ -122,8 +111,7 @@ test("session longevity: school remains authenticated after idle period and refr
   await page.reload();
 
   await expect(page).toHaveURL(/\/dashboard\/ringkasan$/);
-  await page.goto("/dashboard/booking");
-  await expect(page).toHaveURL(/\/dashboard\/booking$/);
+  await openSchoolBookingPage(page);
 });
 
 test("session longevity: logout from one tab invalidates user state in another tab after refresh", async ({
@@ -131,12 +119,12 @@ test("session longevity: logout from one tab invalidates user state in another t
   backend,
 }) => {
   backend.reset();
-  await login(page, "school@example.com");
+  await loginSchool(page);
   await expect(page).toHaveURL(/\/dashboard\/ringkasan$/);
 
   const secondTab = await page.context().newPage();
-  await secondTab.goto("/dashboard/booking");
-  await expect(secondTab).toHaveURL(/\/dashboard\/booking$/);
+  await gotoPath(secondTab, "/dashboard/ringkasan");
+  await expect(secondTab).toHaveURL(/\/dashboard\/ringkasan$/);
 
   await page.getByRole("button", { name: "Logout" }).click();
   await expect(page).toHaveURL(/\/login(?:\?.*)?$/);

@@ -1,22 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "./support/fixtures";
-
-async function login(page: Parameters<typeof test>[0]["page"], email: string) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Kata Sandi").fill("password123");
-  await page.getByRole("button", { name: "Masuk" }).click();
-  await expect(page).toHaveURL(
-    email === "admin@example.com"
-      ? /\/dashboard-admin(?:\?.*)?$/
-      : /\/dashboard\/ringkasan(?:\?.*)?$/,
-  );
-}
-
-async function logout(page: Parameters<typeof test>[0]["page"]) {
-  await page.getByRole("button", { name: "Logout" }).click();
-  await expect(page).toHaveURL(/\/login(?:\?.*)?$/);
-}
+import { gotoPath, loginAdmin, loginSchool, logout, openSchoolBookingPage } from "./support/app";
 
 test("admin can reject a booking and school sees the rejected result", async ({ page, backend }) => {
   backend.reset();
@@ -40,8 +24,8 @@ test("admin can reject a booking and school sees the rejected result", async ({ 
     created_at: "2026-03-15T08:00:00.000Z",
   });
 
-  await login(page, "admin@example.com");
-  await page.goto("/dashboard-admin/booking");
+  await loginAdmin(page);
+  await gotoPath(page, "/dashboard-admin/booking");
   await page.getByPlaceholder("Cari sekolah, topik, atau ID booking").fill("BK-401");
 
   const bookingRow = page.locator("tr", { hasText: "BK-401" });
@@ -57,8 +41,8 @@ test("admin can reject a booking and school sees the rejected result", async ({ 
 
   await logout(page);
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/booking");
+  await loginSchool(page);
+  await openSchoolBookingPage(page);
   await page.getByLabel("Kata Kunci").fill("BK-401");
   const schoolArticle = page.locator("article", { hasText: "BK-401" });
   await expect(schoolArticle).toContainText("Ditolak");
@@ -104,8 +88,8 @@ test("admin can request document revision with filters and the result persists a
     },
   );
 
-  await login(page, "admin@example.com");
-  await page.goto("/dashboard-admin/dokumen");
+  await loginAdmin(page);
+  await gotoPath(page, "/dashboard-admin/dokumen");
   await page.getByRole("button", { name: "Menunggu Review" }).click();
   await page.getByRole("button", { name: "Pelaksanaan" }).click();
 
@@ -254,8 +238,8 @@ test("school can filter riwayat, paginate results, and keep notification read st
     },
   );
 
-  await login(page, "school@example.com");
-  await page.goto("/dashboard/riwayat");
+  await loginSchool(page);
+  await gotoPath(page, "/dashboard/riwayat");
   await expect(page.getByText("Halaman 1 dari 2")).toBeVisible();
   await page.getByRole("button", { name: "Berikutnya" }).click();
   await expect(page.getByText("Halaman 2 dari 2")).toBeVisible();

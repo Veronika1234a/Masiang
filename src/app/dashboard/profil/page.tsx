@@ -27,11 +27,6 @@ const profileSections: Array<{
     title: "Kontak dan Operasional",
     description: "Data yang dipakai untuk komunikasi dan koordinasi pendampingan.",
     fields: [
-      {
-        key: "officialEmail",
-        label: "Email Login",
-        helperText: "Email login akan diperbarui di akun Supabase dan profil sekolah.",
-      },
       { key: "phone", label: "Nomor Telepon" },
       { key: "principalName", label: "Kepala Sekolah" },
       { key: "operatorName", label: "Operator" },
@@ -51,7 +46,7 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
 }
 
 export default function DashboardProfilPage() {
-  const { user, changePassword, updateAvatarPath, updateEmail } = useAuth();
+  const { user, changePassword, updateAvatarPath } = useAuth();
   const { profile, updateProfile, bookings, histories, documents, addToast } = useDashboard();
   const [draft, setDraft] = useState<SchoolProfile>(profile);
   const [isEditing, setIsEditing] = useState(false);
@@ -78,7 +73,6 @@ export default function DashboardProfilPage() {
     "npsn",
     "contactName",
     "educationLevel",
-    "officialEmail",
     "phone",
     "principalName",
     "operatorName",
@@ -122,34 +116,9 @@ export default function DashboardProfilPage() {
       setNpsnError("NPSN harus 8 digit angka.");
       return;
     }
-    const normalizedEmail = draft.officialEmail.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      addToast("Gunakan format email yang valid untuk email login.", "error");
-      return;
-    }
     setNpsnError("");
     try {
-      const nextProfile = { ...draft, officialEmail: normalizedEmail };
-      const shouldChangeEmail = normalizedEmail !== profile.officialEmail.trim().toLowerCase();
-      const profilePayload = shouldChangeEmail
-        ? { ...nextProfile, officialEmail: profile.officialEmail }
-        : nextProfile;
-
-      if (shouldChangeEmail) {
-        const emailResult = await updateEmail(normalizedEmail);
-        if (!emailResult.success) {
-          throw new Error(emailResult.error ?? "Gagal memperbarui email login.");
-        }
-
-        if (!emailResult.emailChanged) {
-          await updateProfile(profilePayload);
-          setDraft(profilePayload);
-          setIsEditing(false);
-          addToast("Cek inbox email baru untuk konfirmasi perubahan email login. Email profil belum diubah sampai konfirmasi selesai.", "info");
-          return;
-        }
-      }
-
+      const nextProfile = { ...draft, officialEmail: profile.officialEmail };
       await updateProfile(nextProfile);
       setDraft(nextProfile);
       setIsEditing(false);
@@ -357,6 +326,7 @@ export default function DashboardProfilPage() {
                 <h2 className="mt-5 font-[var(--font-fraunces)] text-[30px] font-medium leading-[1.05] text-[#121d35]">{profile.schoolName}</h2>
                 <p className="mt-3 text-[14px] leading-[1.75] text-[#4f5b77]">Data profil dipakai pada booking, dokumen, dan komunikasi.</p>
                 <div className="mt-6 space-y-3 border-t border-[#e5dfeb] pt-5">
+                  <div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Akses Login</p><p className="mt-1 text-[14px] font-medium text-[#25365f]">NPSN sekolah + password</p></div>
                   <div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Kontak Utama</p><p className="mt-1 text-[14px] font-medium text-[#25365f]">{profile.contactName || "Belum diisi"}</p></div>
                   <div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Wilayah</p><p className="mt-1 text-[14px] font-medium text-[#25365f]">{profile.district}</p></div>
                   <div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6d7998]">Jenjang</p><p className="mt-1 text-[14px] font-medium text-[#25365f]">{profile.educationLevel}</p></div>
