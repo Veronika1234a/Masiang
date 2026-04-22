@@ -80,7 +80,7 @@ export default function AdminDashboardPage() {
           <div className="max-w-3xl">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#6d7998]">Control Desk</p>
             <h1 className="mt-4 font-[var(--font-fraunces)] text-[clamp(36px,4vw,56px)] font-medium leading-[0.98] tracking-[-0.03em] text-[#121d35]">
-              Dashboard admin,<br />dibaca tanpa bising.
+              Dashboard admin
             </h1>
             <p className="mt-5 max-w-2xl text-[15px] leading-[1.8] text-[#4f5b77]">
               Prioritaskan booking yang butuh keputusan, dokumen yang perlu review,
